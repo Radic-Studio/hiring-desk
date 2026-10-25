@@ -28,8 +28,17 @@ function setup() {
   sb("roles?select=id&limit=1"); // proves the key works
   let token = PROPS.getProperty("MAIL_TOKEN");
   if (!token) { token = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""); PROPS.setProperty("MAIL_TOKEN", token); }
-  const url = ScriptApp.getService().getUrl();
+  let url = ScriptApp.getService().getUrl();
   if (!url) throw new Error("Deploy this script as a Web app first (Deploy → New deployment → Web app, Execute as Me, access Anyone), then run setup again.");
+  if (/\/dev$/.test(url)) {
+    // Run from the editor, getUrl() gives the private test address. Keep the public /exec address if one is already
+    // registered, or take it from the WEB_APP_URL script property (Deploy → Manage deployments → Web app URL).
+    const prop = PROPS.getProperty("WEB_APP_URL");
+    const existing = (sb("app_config?key=eq.mail_relay_url")[0] || {}).value;
+    if (prop && /\/exec$/.test(prop)) url = prop;
+    else if (existing && /\/exec$/.test(existing)) url = existing;
+    else throw new Error("Add a script property WEB_APP_URL with the Web app URL ending in /exec (Deploy → Manage deployments), then run setup again.");
+  }
   sb("app_config?on_conflict=key", "post", [
     { key: "mail_relay_url", value: url }, { key: "mail_relay_token", value: token },
     { key: "mail_relay_account", value: Session.getEffectiveUser().getEmail() }, { key: "mail_relay_registered_at", value: new Date().toISOString() },
