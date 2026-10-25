@@ -396,6 +396,6 @@ FR.renderTeam = function renderTeam() {
   });
 };
 
-document.addEventListener("keydown", e => { if (e.key === "Escape") { if (S.open) FR.modules.hiring?.closeDrawer?.(); togglePop(false); if (!$("#dl-scrim").hidden) FR.modules.hiring?.closeDownload?.(); if (!$("#act-scrim").hidden) $("#act-scrim").hidden = true; } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { FR.modules[S.module]?.closeDrawer?.(); togglePop(false); if (!$("#dl-scrim").hidden) FR.modules.hiring?.closeDownload?.(); if (!$("#act-scrim").hidden) $("#act-scrim").hidden = true; } });
 boot();
 })();

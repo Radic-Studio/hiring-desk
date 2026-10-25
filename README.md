@@ -11,6 +11,7 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 | `index.html` | Shell markup only (sidebar, header, modals). |
 | `app/core.js` | Shared state (`FR.S`), helpers, activity log, Supabase document-store shim, module registry. Loaded first. |
 | `app/modules/hiring.js` | The Hiring module: scoring, views, import, downloads, email. Registers itself with `FR.registerModule`. Works on the active company's data. |
+| `app/modules/people.js` | The People module: staff directory with details, documents (private `staff-docs` bucket, signed links) and leave (requests, approvals, who is away). A hired candidate becomes a staff record from the candidate drawer. |
 | `app/shell.js` | Sign-in gate and sign-up, company switcher, navigation and routing (`#/<company>/<view>`), profile, Team page. Loaded last; calls `boot()`. |
 | `app/styles.css` | All styles. |
 | `config.js` | Publishable settings: Supabase URL and publishable key, form link, sheet link. No secrets. |
@@ -30,6 +31,10 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 ## Companies and roles
 
 `companies` holds the group and each business. A person is a **Group Admin** (`members.level = 'editor'`: everything everywhere, can make other Group Admins) or has a role per company in `company_members`: **Admin** (everything in that company, including its team), **Manager** (create and edit records), **Staff** (work on records), **Viewer** (read and download). Hiring data (`roles`, `candidates`, `issues`) carries `company_id`; row-level security uses `my_company_role(company_id)`. The last active Group Admin can never be removed or demoted.
+
+## People
+
+`staff` (home company plus `companies[]` for people who also work elsewhere; `member_email` links a record to a login), `staff_documents` (metadata; files in the private `staff-docs` bucket under `<company>/<staff>/`), `leave_requests` (status pending → approved/declined through `leave_decide()`, which refuses deciding your own request). Admins and Managers of the home company edit; everyone with a role in the company reads; a linked member requests leave for themself.
 
 ## Adding a module
 

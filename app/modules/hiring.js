@@ -792,12 +792,14 @@ function openDrawer(id) {
         <div class="field"><label>Score (optional, 1–10)</label><input type="number" min="1" max="10" id="i-score" value="${esc(c.interview?.score ?? "")}" ${locked ? "disabled" : ""}></div>
         <div class="field wide"><label>Interview notes</label><textarea id="i-notes" ${locked ? "disabled" : ""}>${esc(c.interview?.notes || "")}</textarea></div>
       </div></div>` : ""}
+    ${FR.modules.people && c.interview?.outcome === "Hired" ? `<div class="banner ok" style="justify-content:space-between;flex-wrap:wrap"><span>Hired. Create their staff record in People, prefilled from this application.</span><button class="btn small primary" id="to-staff">Add to staff</button></div>` : ""}
     <div><h3 style="margin-bottom:6px">History</h3><ul class="history" id="hist">${hist.map(h => `<li><time>${fmtDate(h.ts)}</time><span>${esc(h.summary)} <span class="muted" data-by="${esc(h.by || "")}"></span></span></li>`).join("") || `<li class="muted">No calls logged yet.</li>`}</ul></div>
     ${c.emailedAt || c.lastEmailStatus ? `<div class="banner ${c.lastEmailStatus === "sent" ? (c.status === "contacted" ? "ok" : "info") : c.lastEmailStatus === "unknown" ? "warn" : "bad"}" style="flex-wrap:wrap">${c.lastEmailStatus === "sent" ? (c.status === "contacted" ? "Outreach email sent " + fmtDate(c.emailedAt) + ". Reply recorded." : "Outreach email sent " + fmtDate(c.emailedAt) + ". Awaiting their reply; the record updates on its own when they answer the form.") : c.lastEmailStatus === "unknown" ? "Last email: outcome unknown. Check your Gmail Sent folder before resending." : "Last email failed: " + esc(c.lastEmailError || "")}${(c.outreach || []).length > 1 ? ` · ${(c.outreach || []).length} attempts` : ""}${c.lastEmailStatus === "sent" && c.status !== "contacted" && !locked ? `<button class="btn small" id="rec-reply" style="margin-left:auto">Record their reply manually</button>` : ""}</div>` : ""}
     <div class="toolbar">${locked ? "" : `<button class="btn small" id="em-one" ${c.email ? "" : "disabled"} title="${c.email ? "Send the outreach email to " + esc(c.email) : "No email address"}">Email outreach</button>`}${DL ? `<button class="btn small" id="dl-one">Download this profile</button>` : ""}${locked ? "" : `<span id="rm-box" style="margin-left:auto"><button class="btn small danger" id="rm">Remove from ${esc(rl.name)}</button></span>`}</div>
   </div>
   <footer>${locked ? `<span class="muted">Read only</span>` : `<button class="btn primary" id="save">Save</button><button class="btn" id="noanswer">Log no answer</button>`}<span class="muted" style="margin-left:auto;font-size:12px">${c.lastContact ? "Last update " + fmtDate(c.lastContact) : ""}</span></footer>`;
   showDrawer();
+  $("#to-staff")?.addEventListener("click", () => { closeDrawer(); FR.modules.people.fromCandidate(c, rl.name); });
   $("#dl-one")?.addEventListener("click", () => openDownload({ kind: "candidate", id }));
   $("#em-one")?.addEventListener("click", () => openEmail([id]));
   $("#rec-reply")?.addEventListener("click", () => { for (const x of $("#status").children) x.setAttribute("aria-pressed", x.dataset.v === "contacted"); $("#f-mode").value = "Email"; $("#f-avail").focus(); toast("Set their availability and location, then Save", "warn"); });
@@ -866,6 +868,11 @@ FR.registerModule({
   },
   onCompany() { S.role = null; S.sel.clear(); S.imp = null; if (S.open) closeDrawer(); scope(); render(); },
   render, headerDownload: true, closeDrawer, closeDownload,
+  async markHired(candidateId, staffId) {
+    const c = S.all.cands[candidateId]; if (!c) return;
+    const body = { ...c, interview: { ...(c.interview || {}), outcome: "Hired", staffId: staffId || null }, history: [...(c.history || []), { ts: new Date().toISOString(), by: S.me?.id || null, summary: "Added to staff (People)" }].slice(-50) };
+    delete body.id; try { await S.db.doc("candidates/" + candidateId).set(body); } catch (e) { logAct("warn", "Could not note the hire on the candidate", e.message || ""); }
+  },
 });
 $("#em-scrim").addEventListener("click", e => { if (e.target === $("#em-scrim") && $("#em-go") && !$("#em-go").disabled) closeEmail(); });
 })();
