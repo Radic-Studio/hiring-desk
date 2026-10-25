@@ -1046,7 +1046,7 @@ async function sendBatch(list, t) {
     try {
       const r = await sendViaFunction(c, subject, body);
       status = r.status; messageId = r.messageId || null; detail = r.error || "";
-      if (status === "sent") { sent++; setSt(c.id, "sent ✓", "ok"); logAct("ok", `Email sent to ${c.name}`, `To: ${c.email}\nSubject: ${subject}\nMessage id: ${messageId || "not returned"}`); }
+      if (status === "sent") { sent++; setSt(c.id, typeof r.remaining === "number" ? `sent ✓ (${r.remaining} left today)` : "sent ✓", "ok"); logAct("ok", `Email sent to ${c.name}`, `To: ${c.email}\nSubject: ${subject}\nMessage id: ${messageId || "not returned"}`); }
       else if (status === "unknown") { unknown++; setSt(c.id, "unknown: check the sender's log", "warn"); logAct("warn", `Email to ${c.name} unknown`, `To: ${c.email}\n${detail}`); }
       else { failed++; setSt(c.id, "failed", "bad"); logAct("bad", `Email to ${c.name} failed`, `To: ${c.email}\n${detail}`); }
     } catch (e) {

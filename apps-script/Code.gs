@@ -1,11 +1,16 @@
 /**
- * Future Ready Hiring Desk: hourly job for the standalone (Supabase) build.
- *  A) pull new Google Form responses into the database
- *  B) mirror the database into this spreadsheet (one tab per role + Second Interview, Issues, Call Log, Sync Info)
+ * Future Ready Hiring Desk: Google-side helper for the standalone (Supabase) build. One script, three jobs:
+ *  A) every hour, pull new Google Form responses into the database
+ *  B) every hour, mirror the database into this spreadsheet (one tab per role + Second Interview, Issues, Call Log, Sync Info)
+ *  C) on demand, send the desk's outreach and interview emails from this Google account (Gmail)
  *
- * Install: open the "Future Ready Candidates" spreadsheet → Extensions → Apps Script → paste this file →
- * Project Settings → Script properties: SUPABASE_URL, SUPABASE_SERVICE_KEY (the service_role key, never the anon key) →
- * Triggers → add a time-driven trigger: runHourly, every hour. Run once by hand first and grant permissions.
+ * Install (once):
+ *  1. Open the "Future Ready Candidates" spreadsheet → Extensions → Apps Script → replace the contents with this file → Save.
+ *  2. Project Settings (gear) → Script properties → add SUPABASE_URL and SUPABASE_SERVICE_KEY (the secret/service_role key, never the publishable key).
+ *  3. Deploy → New deployment → type "Web app" → Execute as: Me → Who has access: Anyone → Deploy.
+ *  4. Back in the editor pick the function `setup` and press Run. Grant the permissions it asks for.
+ *     setup() registers this script's address and a random token in the database (so the desk can send email),
+ *     creates the hourly trigger, and runs the first sync. Nothing else to configure.
  */
 const PROPS = PropertiesService.getScriptProperties();
 const URL_ = () => PROPS.getProperty("SUPABASE_URL");
@@ -13,8 +18,52 @@ const KEY_ = () => PROPS.getProperty("SUPABASE_SERVICE_KEY");
 const SS = () => SpreadsheetApp.getActiveSpreadsheet();
 const AVAIL = ["Immediately", "In one week", "Within a month", "Not available"];
 const LOCS = ["Close to office", "Within Enugu", "Outside Enugu Town", "Other state", "Unknown"];
+const SENDER_NAME = "Future Ready Nigeria";
 
 function runHourly() { const n = ingestFormResponses(); syncToSheet(n); }
+
+/* ---------- one-time setup ---------- */
+function setup() {
+  if (!URL_() || !KEY_()) throw new Error("Add SUPABASE_URL and SUPABASE_SERVICE_KEY under Project Settings → Script properties first.");
+  sb("roles?select=id&limit=1"); // proves the key works
+  let token = PROPS.getProperty("MAIL_TOKEN");
+  if (!token) { token = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, ""); PROPS.setProperty("MAIL_TOKEN", token); }
+  const url = ScriptApp.getService().getUrl();
+  if (!url) throw new Error("Deploy this script as a Web app first (Deploy → New deployment → Web app, Execute as Me, access Anyone), then run setup again.");
+  sb("app_config?on_conflict=key", "post", [
+    { key: "mail_relay_url", value: url }, { key: "mail_relay_token", value: token },
+    { key: "mail_relay_account", value: Session.getEffectiveUser().getEmail() }, { key: "mail_relay_registered_at", value: new Date().toISOString() },
+  ], "resolution=merge-duplicates,return=minimal");
+  if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "runHourly")) ScriptApp.newTrigger("runHourly").timeBased().everyHours(1).create();
+  runHourly();
+  Logger.log("Setup complete. Emails will be sent from " + Session.getEffectiveUser().getEmail() + " (" + MailApp.getRemainingDailyQuota() + " left today). Hourly sync is on.");
+}
+
+/* ---------- C: email relay (called by the Supabase send-email function) ---------- */
+function doPost(e) {
+  const out = (o) => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  let p; try { p = JSON.parse(e.postData.contents); } catch (err) { return out({ ok: false, error: "bad_json" }); }
+  const token = PROPS.getProperty("MAIL_TOKEN");
+  if (!token || p.token !== token) return out({ ok: false, error: "bad_token" });
+  const to = String(p.to || "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return out({ ok: false, error: "bad_address" });
+  const subject = String(p.subject || "").slice(0, 300), text = String(p.text || "").slice(0, 20000), html = String(p.html || "").slice(0, 60000);
+  if (!subject || !text) return out({ ok: false, error: "empty_message" });
+  const remaining = MailApp.getRemainingDailyQuota();
+  if (remaining < 1) return out({ ok: false, error: "Gmail daily sending limit reached; try again tomorrow", remaining });
+  try {
+    GmailApp.sendEmail(to, subject, text, { htmlBody: html || undefined, name: SENDER_NAME });
+    return out({ ok: true, id: null, remaining: remaining - 1 });
+  } catch (err) { return out({ ok: false, error: String(err.message || err), remaining }); }
+}
+function doGet() { return ContentService.createTextOutput("Future Ready Hiring Desk mail relay: POST only."); }
+
+/* ---------- quick checks you can run by hand ---------- */
+function status() {
+  Logger.log("Sends left today: " + MailApp.getRemainingDailyQuota() + " from " + Session.getEffectiveUser().getEmail());
+  Logger.log("Hourly trigger: " + (ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "runHourly") ? "on" : "OFF, run setup()"));
+  Logger.log("Web app URL registered: " + (ScriptApp.getService().getUrl() || "NOT DEPLOYED"));
+}
 
 /* ---------- Supabase REST helpers (service role; bypasses row-level security, so keep the key in script properties only) ---------- */
 function sb(path, method, body, prefer) {

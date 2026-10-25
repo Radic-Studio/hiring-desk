@@ -12,16 +12,15 @@ This is the standalone build. It runs on **Supabase** (database, Google sign-in,
 | `config.js` | Publishable settings: Supabase URL and publishable key, form link, sheet link. No secrets. |
 | `netlify.toml` | Static publish config and security headers. |
 | `supabase/migrations/*.sql` | Database schema, row-level security, defaults. Already applied to the project. |
-| `supabase/functions/send-email/index.ts` | Edge function that sends outreach and interview emails through Resend. Already deployed. |
-| `apps-script/Code.gs` | Hourly Google Apps Script: pulls form replies into the database and mirrors the database into the Google Sheet. |
+| `supabase/functions/send-email/index.ts` | Edge function that checks the sender and candidate, then relays the email to the Apps Script, which sends it from Gmail. Already deployed. |
+| `apps-script/Code.gs` | Google Apps Script in the sheet: hourly form-reply ingest and sheet mirror, plus the Gmail relay the desk sends email through. |
 
 ## One-time setup (owner)
 
 1. **Google sign-in.** In Google Cloud Console create an OAuth 2.0 Client ID (Web application). Authorised redirect URI: `https://muagpehopedxycfiqupg.supabase.co/auth/v1/callback`. Authorised JavaScript origin: your Netlify site URL. In Supabase → Authentication → Providers → Google: paste the Client ID and Secret, enable. In Supabase → Authentication → URL Configuration: set Site URL to the Netlify URL and add it to Redirect URLs.
-2. **Email.** Sign up at resend.com, verify your domain, create an API key. In Supabase → Edge Functions → Secrets add `RESEND_API_KEY` and `MAIL_FROM` (e.g. `Future Ready Nigeria <hiring@yourdomain.com>`).
-3. **Members.** In Supabase → Table Editor → `members`, add each person's Google email with a level: `viewer`, `contributor` or `editor`. Anyone not listed cannot load data.
-4. **Hourly job.** Open the Google Sheet → Extensions → Apps Script → paste `apps-script/Code.gs`. Project Settings → Script properties: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API → service_role; keep it secret). Run `runHourly` once by hand to grant permissions, then Triggers → time-driven, every hour.
-5. **Deploy.** Netlify → Add new site → Import from Git → this repository. No build command; publish directory `.`. Every push to `main` redeploys.
+2. **Members.** In Supabase → Table Editor → `members`, add each person's Google email with a level: `viewer`, `contributor` or `editor`. Anyone not listed cannot load data.
+3. **Email and hourly job (one script).** Open the Google Sheet → Extensions → Apps Script → paste `apps-script/Code.gs` → Save. Project Settings → Script properties: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API keys → secret key; never the publishable key). Deploy → New deployment → Web app, execute as Me, access Anyone → Deploy. Then run the `setup` function once and grant permissions. It registers the script's address and a random token in `app_config` (the `send-email` function relays through it), creates the hourly trigger and runs the first sync. Emails go out from the Google account that ran `setup`; consumer Gmail allows about 100 recipients per day, Google Workspace about 1,500.
+4. **Deploy.** Netlify → Add new site → Import from Git → this repository. No build command; publish directory `.`. Every push to `main` redeploys.
 
 ## Access levels
 

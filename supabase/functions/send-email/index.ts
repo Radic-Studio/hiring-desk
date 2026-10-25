@@ -1,7 +1,10 @@
 // Future Ready Hiring Desk: send one outreach or interview email to a candidate.
 // The page sends only the candidate id and the rendered subject/body; the address is looked up here,
 // so a tampered page cannot email arbitrary recipients. Requires a signed-in member at contributor level or above.
-// Deployed to the Supabase project as `send-email` (verify_jwt: true). Secrets: RESEND_API_KEY, MAIL_FROM (optional).
+// Delivery: the message is relayed to the Google Apps Script attached to the "Future Ready Candidates" sheet,
+// which sends it from the company Gmail account (GmailApp). The script registers its own URL and a random token
+// in public.app_config when its setup() is run; nothing is configured by hand here.
+// Deployed to the Supabase project as `send-email` (verify_jwt: true).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -37,20 +40,27 @@ Deno.serve(async (req) => {
   const { count } = await admin.from("candidates").select("id", { count: "exact", head: true }).gte("last_email_at", since).eq("last_by", email);
   if ((count ?? 0) >= 120) return json(429, { error: "rate_limited", detail: "More than 120 emails in the last hour" });
 
-  const from = Deno.env.get("MAIL_FROM") ?? "Future Ready Nigeria <onboarding@resend.dev>";
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) return json(500, { error: "not_configured", detail: "RESEND_API_KEY is not set" });
+  // relay settings registered by the Apps Script's setup()
+  const { data: cfgRows } = await admin.from("app_config").select("key,value").in("key", ["mail_relay_url", "mail_relay_token"]);
+  const cfg: Record<string, string> = {}; for (const r of cfgRows ?? []) cfg[r.key] = r.value;
+  if (!cfg.mail_relay_url || !cfg.mail_relay_token) return json(500, { error: "not_configured", detail: "Email is not set up yet: run setup() in the Google Sheet's Apps Script" });
+
   let html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#101828;max-width:600px">${esc(text).replace(/\n/g, "<br>")}</div>`;
   if (formUrl && text.includes(formUrl)) html = html.replace(esc(formUrl), `<a href="${esc(formUrl)}" style="display:inline-block;background:#2f5bff;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold">Answer the follow-up form</a><br><span style="font-size:12px;color:#667085">Or copy this link: ${esc(formUrl)}</span>`);
 
   const now = new Date().toISOString();
-  let status: "sent" | "failed" | "unknown" = "unknown", messageId: string | null = null, errText = "";
+  let status: "sent" | "failed" | "unknown" = "unknown", messageId: string | null = null, errText = "", remaining: number | null = null;
   try {
-    const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [c.email], subject, text, html }) });
-    const out = await r.json().catch(() => ({}));
-    if (r.ok && out?.id) { status = "sent"; messageId = out.id; }
-    else if (r.status >= 500 || r.status === 429) { status = "unknown"; errText = out?.message || `Resend ${r.status}`; }
-    else { status = "failed"; errText = out?.message || `Resend ${r.status}`; }
+    // Apps Script web apps answer with a redirect to a one-time googleusercontent URL; fetch follows it.
+    const r = await fetch(cfg.mail_relay_url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
+      body: JSON.stringify({ token: cfg.mail_relay_token, to: c.email, name: c.name, subject, text, html, kind, candidateId }) });
+    const raw = await r.text();
+    let out: { ok?: boolean; id?: string; error?: string; remaining?: number } = {};
+    try { out = JSON.parse(raw); } catch { out = { error: `Relay answered ${r.status}: ${raw.slice(0, 120)}` }; }
+    if (typeof out.remaining === "number") remaining = out.remaining;
+    if (r.ok && out.ok) { status = "sent"; messageId = out.id ?? null; }
+    else if (r.status >= 500) { status = "unknown"; errText = out.error || `Relay ${r.status}`; }
+    else { status = "failed"; errText = out.error || `Relay ${r.status}`; }
   } catch (e) { status = "unknown"; errText = (e as Error).message; }
 
   const label = kind === "interview" ? "Interview invitation" : "Outreach email";
@@ -64,5 +74,5 @@ Deno.serve(async (req) => {
     if (status === "sent" && c.status !== "contacted") { patch.status = "awaiting"; if (!c.mode) patch.mode = "Email"; }
   }
   await admin.from("candidates").update(patch).eq("id", candidateId);
-  return json(200, { status, messageId, error: errText || undefined });
+  return json(200, { status, messageId, remaining, error: errText || undefined });
 });
