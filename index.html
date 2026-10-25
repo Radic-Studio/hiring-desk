@@ -23,7 +23,27 @@ html,body{height:100%}
 img{max-width:100%}
 /* sign-in */
 .gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50;padding:16px}
-.gate .card{max-width:420px;width:100%;text-align:center;display:grid;gap:14px;padding:28px}
+.gate .card{max-width:440px;width:100%;text-align:center;display:grid;gap:14px;padding:28px}
+.gate .card.wide{max-width:560px;text-align:left}
+.gate .fields{text-align:left}
+.gate .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.gate .gbtn svg{width:18px;height:18px}
+.gate .who{display:flex;align-items:center;gap:10px;justify-content:center;font-size:13px;color:var(--muted)}
+.gate .who .avatar{width:34px;height:34px}
+.pf-photo{display:flex;align-items:center;gap:14px}
+.pf-photo .avatar{width:64px;height:64px;font-size:20px}
+.pf-photo .hint{margin:0}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.team-list{display:grid;gap:8px}
+.member{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface)}
+.member .avatar{width:40px;height:40px;font-size:14px}
+.member b{display:block;font-size:13px}
+.member small{display:block;color:var(--muted);font-size:12px;line-height:1.35}
+.member .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.member .acts select{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-s);padding:4px 8px;font-size:12px}
+.member.me-row{border-color:var(--accent-line);background:var(--accent-soft)}
+.member.off{opacity:.6}
+@media (max-width:640px){.member{grid-template-columns:auto 1fr}.member .acts{grid-column:1/-1;justify-content:flex-start}}
 .gate .mark{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:800;margin:0 auto;box-shadow:0 6px 18px rgba(47,91,255,.35)}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.5}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
@@ -308,7 +328,7 @@ td.sel input,th.sel input{width:16px;height:16px;accent-color:var(--accent);curs
 </style>
 </head>
 <body>
-<div class="gate" id="gate" hidden><div class="card"><div class="mark">FR</div><h1>Future Ready Hiring Desk</h1><p class="muted" id="gate-msg">Sign in with the Google account your administrator added.</p><button class="btn primary" id="gate-google" style="justify-content:center">Continue with Google</button><p class="hint" id="gate-note"></p></div></div>
+<div class="gate" id="gate" hidden><div class="card" id="gate-card"><div class="mark">FR</div><h1 id="gate-title">Future Ready Hiring Desk</h1><p class="muted" id="gate-msg">Sign in with your Google account. New here? The same button creates your account; an Admin then approves it.</p><div id="gate-body"><button class="btn primary gbtn" id="gate-google"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#fff" opacity=".8" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fff" opacity=".6" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#fff" opacity=".9" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></svg>Continue with Google</button></div><p class="hint" id="gate-note"></p></div></div>
 <div class="app">
 <aside class="side">
   <div class="brand"><div class="mark">FR</div><div><b>Hiring Desk</b><small>Future Ready Nigeria</small></div></div>
@@ -319,6 +339,7 @@ td.sel input,th.sel input{width:16px;height:16px;accent-color:var(--accent);curs
     <button role="tab" data-view="issues"><svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span class="lbl">Issues</span><span class="cnt" id="cnt-is">0</span></button>
     <button role="tab" data-view="import"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span class="lbl">Import</span></button>
     <button role="tab" data-view="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="lbl">History</span><span class="cnt" id="cnt-hi">0</span></button>
+    <button role="tab" data-view="team" id="tab-team" hidden><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-tm" hidden>0</span></button>
   </nav>
   <div class="foot">
     <div class="pop" id="pop" hidden></div>
@@ -344,6 +365,7 @@ td.sel input,th.sel input{width:16px;height:16px;accent-color:var(--accent);curs
     <section class="view" id="v-issues" hidden></section>
     <section class="view" id="v-import" hidden></section>
     <section class="view" id="v-history" hidden></section>
+    <section class="view" id="v-team" hidden></section>
   </main>
   <footer class="foot-site">
     <span class="brandline"><i></i>Future Ready Nigeria Ltd · Hiring Desk</span>
@@ -362,6 +384,7 @@ td.sel input,th.sel input{width:16px;height:16px;accent-color:var(--accent);curs
 <div class="modal-scrim" id="dl-scrim" hidden><div class="modal" id="dl-modal" role="dialog" aria-modal="true" aria-labelledby="dl-title"></div></div>
 <div class="modal-scrim" id="em-scrim" hidden><div class="modal wide" id="em-modal" role="dialog" aria-modal="true" aria-labelledby="em-title"></div></div>
 <div class="modal-scrim" id="act-scrim" hidden><div class="modal" id="act-modal" role="dialog" aria-modal="true" aria-labelledby="act-title"></div></div>
+<div class="modal-scrim" id="pf-scrim" hidden><div class="modal" id="pf-modal" role="dialog" aria-modal="true" aria-labelledby="pf-title"></div></div>
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" aria-hidden="true"></aside>
 <div class="toast" id="toast" role="status"></div>
@@ -385,7 +408,7 @@ const DEFAULT_SETTINGS = {
 };
 // Fallback role definitions for the two original roles, used until roles/* documents load.
 const LEGACY_ROLES = { bd: { name: "Business Developer", qualWeight: 1, top: 10, second: 20 }, gd: { name: "Graphic Designer", qualWeight: 0.5, top: 10, second: 25 } };
-const TITLES = { dashboard: ["Dashboard", "Live picture of the screening"], candidates: ["Candidates", "Pick a role, then tap a row to log a call"], interview: ["Second Interview", "Candidates who met the criteria, best first"], issues: ["Data issues", "Register problems to resolve before trusting a record"], import: ["Import a role", "Upload the Jobberman applicant export for a new role"], history: ["History", "Roles whose recruitment has ended, with their final numbers"] };
+const TITLES = { dashboard: ["Dashboard", "Live picture of the screening"], candidates: ["Candidates", "Pick a role, then tap a row to log a call"], interview: ["Second Interview", "Candidates who met the criteria, best first"], issues: ["Data issues", "Register problems to resolve before trusting a record"], import: ["Import a role", "Upload the Jobberman applicant export for a new role"], history: ["History", "Roles whose recruitment has ended, with their final numbers"], team: ["Team", "Who can use the desk, invitations and access requests"] };
 const CFG = window.HIRING_DESK_CONFIG || {};
 const SHEET_URL = CFG.sheetUrl || "#";
 const FORM_URL = CFG.formUrl || "";
@@ -466,9 +489,10 @@ function compute() {
 }
 
 /* ---------- views ---------- */
-const VIEWS = ["dashboard", "candidates", "interview", "issues", "import", "history"];
+const VIEWS = ["dashboard", "candidates", "interview", "issues", "import", "history", "team"];
 function setView(v, opts = {}) {
   if (!VIEWS.includes(v)) v = "dashboard";
+  if (v === "team" && !S.me?.canEdit) v = "dashboard";
   S.view = v;
   if (opts.role !== undefined) S.role = opts.role;
   if (opts.filters) S.filters = { q: "", status: "", loc: "", tier: "", avail: "", ...opts.filters };
@@ -496,6 +520,7 @@ function render() {
   if (S.view === "issues") renderIssues();
   if (S.view === "import") renderImport();
   if (S.view === "history") renderHistory(comp);
+  if (S.view === "team") renderTeam();
 }
 function pillStatus(c) {
   if (c.status === "contacted") return `<span class="pill ok">Contacted</span>${c.selfReported ? ` <span class="pill info flat" title="Answered the follow-up form; details not yet confirmed by a person">Self-reported</span>` : ""}`;
@@ -1238,7 +1263,7 @@ async function saveDrawer(c, noAnswer = false) {
   if (await write(S.db.doc("candidates/" + c.id), body, "Saved")) closeDrawer();
 }
 async function resolveNames(ids) {
-  if (!ids.length) return;
+  if (!ids.length && !document.querySelector("[data-by]")) return;
   for (const el of document.querySelectorAll("[data-by]")) { const id = el.dataset.by; if (!id) continue; const m = S.members[id.toLowerCase()]; el.textContent = "· " + (m?.name || id); }
 }
 let writing = false;
@@ -1256,31 +1281,246 @@ async function write(ref, body, okMsg) {
 }
 
 /* ---------- account panel ---------- */
-function roleLabel() { const m = S.me; return !m ? "Not signed in" : S.canWrite === false ? "Viewer" : m.canEdit ? "Editor" : "Contributor"; }
+const LEVEL_LABEL = { editor: "Admin", viewer: "Employee", contributor: "Contributor" };
+function roleLabel() { const m = S.me; return !m ? "Not signed in" : S.canWrite === false ? "Employee" : m.canEdit ? "Admin" : "Contributor"; }
 function paintRole() {
   const m = S.me, el = $("#me"), lab = roleLabel();
-  const cls = lab === "Viewer" ? "view" : m ? "edit" : "";
+  const cls = lab === "Employee" ? "view" : m ? "edit" : "";
   const initials = (m?.name || "?").split(" ").map(x => x[0]).slice(0, 2).join("").toUpperCase();
-  el.innerHTML = `<div class="avatar">${m?.avatarUrl ? `<img src="${esc(m.avatarUrl)}" alt="">` : esc(initials)}</div><div style="min-width:0"><b>${esc(m?.name || "Guest")}</b><small><span class="role ${cls}">${lab}${lab === "Viewer" ? " · read only" : ""}</span></small></div><span class="chev">▲</span>`;
-  if (m && S.canWrite === false) notice("warn", "You're viewing in read-only mode. Only Contributors and Editors can log calls or change records; the owner grants access from the Share menu.");
+  el.innerHTML = `<div class="avatar">${m?.avatarUrl ? `<img src="${esc(m.avatarUrl)}" alt="">` : esc(initials)}</div><div style="min-width:0"><b>${esc(m?.name || "Guest")}</b><small><span class="role ${cls}">${lab}${lab === "Employee" ? " · read only" : ""}</span></small></div><span class="chev">▲</span>`;
+  $("#tab-team").hidden = !m?.canEdit;
+  if (m && S.canWrite === false) notice("warn", "You have Employee access: you can read everything and download, but not change records. An Admin can change your role from the Team page.");
 }
 function togglePop(force) {
   const pop = $("#pop"), btn = $("#me"); const open = force ?? pop.hidden; if (!open) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); return; }
   const m = S.me, lab = roleLabel();
-  const can = { "Not signed in": ["Nothing loads until you sign in"], Viewer: ["See every candidate, score, and the second-interview list", "Download Excel, CSV and PDF", "Cannot log calls or change records"], Contributor: ["Log calls, set availability and location", "Send outreach and interview emails", "Resolve data issues; import roles"], Editor: ["Everything a Contributor can do", "Change the scoring rules and email templates", "Manage who has access"] }[lab];
-  pop.innerHTML = `<h3>${esc(m?.name || "Guest")} <span class="role ${lab === "Viewer" ? "view" : m ? "edit" : ""}">${lab}</span></h3>
-    <p>${m?.email ? esc(m.email) + "<br>" : ""}Access is managed by an editor in the members list. Sign-in is with Google; there is no separate password.</p>
+  const can = { "Not signed in": ["Nothing loads until you sign in"], Employee: ["See every candidate, score, and the second-interview list", "Download Excel, CSV and PDF", "Cannot log calls or change records"], Contributor: ["Log calls, set availability and location", "Send outreach and interview emails", "Resolve data issues; import roles"], Admin: ["Everything: log calls, send emails, import and close roles", "Change the scoring rules and email templates", "Invite people, approve requests, make other Admins"] }[lab];
+  pop.innerHTML = `<h3>${esc(m?.name || "Guest")} <span class="role ${lab === "Employee" ? "view" : m ? "edit" : ""}">${lab}</span></h3>
+    <p>${m?.email ? esc(m.email) + "<br>" : ""}${m?.position ? esc(m.position) + "<br>" : ""}Sign-in is with Google; there is no separate password. Admins manage access from the Team page.</p>
     <ul>${can.map(x => `<li>${x}</li>`).join("")}</ul>
-    <div class="toolbar">${m ? `<button class="btn small" id="pop-copy">Copy page link</button><button class="btn small" id="pop-out">Sign out</button>` : ``}<button class="btn small" id="pop-close">Close</button></div>`;
+    <div class="toolbar">${m ? `<button class="btn small" id="pop-profile">Edit profile</button><button class="btn small" id="pop-copy">Copy page link</button><button class="btn small" id="pop-out">Sign out</button>` : ``}<button class="btn small" id="pop-close">Close</button></div>`;
   pop.hidden = false; btn.setAttribute("aria-expanded", "true");
   $("#pop-close").onclick = () => togglePop(false);
   $("#pop-out")?.addEventListener("click", async () => { await SB.auth.signOut(); location.reload(); });
+  $("#pop-profile")?.addEventListener("click", () => { togglePop(false); openProfile(false); });
   $("#pop-copy")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(location.href.split("#")[0]); toast("Link copied"); } catch { toast("Copy the link from your address bar"); } });
 }
 $("#me").addEventListener("click", () => togglePop());
 $("#act-btn").addEventListener("click", openActivity);
-$("#me-mobile").addEventListener("click", () => { const lab = roleLabel(); toast(`${S.me?.name || "Guest"} · ${lab}${lab === "Viewer" ? " (read only)" : ""}`); });
+$("#me-mobile").addEventListener("click", () => { if (S.me) openProfile(false); else { const lab = roleLabel(); toast(`Guest · ${lab}`); } });
 document.addEventListener("click", e => { if (!e.target.closest(".foot") && !$("#pop").hidden) togglePop(false); });
+
+/* ---------- accounts: gate states, sign-up, profile, team ---------- */
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function googleProfile(session) {
+  const u = session?.user?.user_metadata || {};
+  const name = u.full_name || u.name || "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return { name, avatar: u.avatar_url || u.picture || "", first: u.given_name || parts[0] || "", surname: u.family_name || (parts.length > 1 ? parts[parts.length - 1] : ""), other: parts.length > 2 ? parts.slice(1, -1).join(" ") : "" };
+}
+const GOOGLE_BTN = () => $("#gate-google")?.outerHTML || "";
+function gateState(state, d = {}) {
+  const card = $("#gate-card"), title = $("#gate-title"), msg = $("#gate-msg"), body = $("#gate-body"), note = $("#gate-note");
+  card.classList.toggle("wide", state === "signup");
+  $("#gate").hidden = false; note.textContent = "";
+  const signout = `<button class="btn small" id="gate-out">Sign out</button>`;
+  if (state === "invited") {
+    title.textContent = "You have been invited";
+    msg.textContent = "Sign in with the Google account that received the invitation email. Your account is ready; you will only be asked for your details.";
+    return;
+  }
+  if (state === "signup") {
+    const g = d.g || {};
+    title.textContent = "Request access";
+    msg.textContent = `${d.email} is not on the team yet. Send a request and an Admin will approve it.`;
+    body.innerHTML = `<div class="fields">
+      <div class="field wide"><label>Your name</label><input id="su-name" value="${esc(g.name || "")}" placeholder="As it should appear to colleagues"></div>
+      <div class="field wide"><label>Access you need</label><select id="su-level"><option value="viewer">Employee — read and download only</option><option value="editor">Admin — full access</option></select></div>
+      </div>
+      <div class="toolbar" style="justify-content:flex-end"><button class="btn small" id="gate-out">Use another account</button><button class="btn primary" id="su-go">Send request</button></div>`;
+    $("#su-go").onclick = async () => {
+      const b = $("#su-go"); b.disabled = true; b.textContent = "Sending…";
+      const { data, error } = await SB.rpc("request_access", { p_requested: $("#su-level").value, p_name: $("#su-name").value.trim() });
+      if (error) { b.disabled = false; b.textContent = "Send request"; note.textContent = error.message; return; }
+      gateState("pending", { me: data });
+    };
+    $("#gate-out").onclick = () => SB.auth.signOut();
+    return;
+  }
+  if (state === "pending") {
+    title.textContent = "Request sent";
+    msg.textContent = `An Admin has to approve ${d.me?.email || "your account"} before anything loads. You will be able to sign in as soon as that is done; this page checks by itself.`;
+    body.innerHTML = `<div class="who"><div class="avatar">${(d.me?.name || "?").slice(0, 1).toUpperCase()}</div><div style="text-align:left"><b>${esc(d.me?.name || d.me?.email || "")}</b><br>Requested: ${esc(LEVEL_LABEL[d.me?.requested_level] || "Employee")}</div></div>
+      <div class="toolbar" style="justify-content:center">${signout}</div>`;
+    $("#gate-out").onclick = () => SB.auth.signOut();
+    clearInterval(gateState.poll);
+    gateState.poll = setInterval(async () => { const { data } = await SB.rpc("my_member"); if (data && data.status === "active") { clearInterval(gateState.poll); S.entering = false; const { data: { session } } = await SB.auth.getSession(); if (session) enter(session); } }, 20000);
+    return;
+  }
+  if (state === "disabled") {
+    title.textContent = "Access switched off";
+    msg.textContent = `${d.me?.email || "This account"} has been disabled by an Admin. Ask them to switch it back on.`;
+    body.innerHTML = `<div class="toolbar" style="justify-content:center">${signout}</div>`;
+    $("#gate-out").onclick = () => SB.auth.signOut();
+    return;
+  }
+  if (state === "error") { title.textContent = "Something is wrong"; msg.textContent = d.msg || ""; body.innerHTML = `<div class="toolbar" style="justify-content:center">${signout}</div>`; $("#gate-out").onclick = () => SB.auth.signOut(); }
+}
+async function loadMembers() {
+  const { data, error } = await SB.from("members").select("email,name,level,status,position,photo_url,phone,surname,first_name,other_names,requested_level,added_at,joined_at,last_seen_at,invited_by,invite_sent_at,profile_done").order("added_at");
+  if (error) { logAct("bad", "Could not load the team list", error.message); return; }
+  S.team = data || []; S.members = {}; for (const m of S.team) S.members[m.email.toLowerCase()] = m;
+  const pend = S.team.filter(m => m.status === "pending").length; const c = $("#cnt-tm"); c.textContent = pend; c.hidden = !pend;
+  if (S.view === "team") render(); else resolveNames([]);
+  if (S.me && S.members[S.me.email]) { const mm = S.members[S.me.email]; if (mm.status !== "active" || mm.level !== S.me.level) location.reload(); }
+  if (!loadMembers.sub) loadMembers.sub = subscribe("members", loadMembers);
+}
+/* profile form: first sign-in (forced) or from the account menu */
+function openProfile(first) {
+  const m = S.me; if (!m) return;
+  const p = m.profile || {}, g = m.g || {};
+  const v = { surname: p.surname || g.surname || "", first_name: p.first_name || g.first || "", other_names: p.other_names || g.other || "", phone: p.phone || "", position: p.position || "", photo_url: p.photo_url || g.avatar || "" };
+  const modal = $("#pf-modal"); $("#pf-scrim").hidden = false;
+  const initials = ((v.first_name[0] || "") + (v.surname[0] || "")).toUpperCase() || "?";
+  modal.innerHTML = `<h2 id="pf-title">${first ? "Complete your profile" : "Your profile"} <small class="muted" style="font-family:var(--body);font-weight:400;font-size:12px">${esc(m.email)}</small></h2>
+    ${first ? `<p class="muted" style="margin:0 0 12px">Colleagues see this on the Team page and next to the calls you log. Details from your Google account are filled in; correct anything that is wrong.</p>` : ""}
+    <div class="pf-photo" style="margin-bottom:12px"><div class="avatar" id="pf-avatar">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="">` : esc(initials)}</div>
+      <div><input type="file" id="pf-file" accept="image/png,image/jpeg,image/webp" hidden><button class="btn small" id="pf-upload">Upload a photo</button> ${g.avatar ? `<button class="btn small" id="pf-google">Use Google photo</button>` : ""}<p class="hint">JPG, PNG or WebP. It is resized to 256 px.</p></div></div>
+    <div class="fields">
+      <div class="field"><label>Surname</label><input id="pf-surname" value="${esc(v.surname)}" autocomplete="family-name"></div>
+      <div class="field"><label>First name</label><input id="pf-first" value="${esc(v.first_name)}" autocomplete="given-name"></div>
+      <div class="field wide"><label>Other names <span class="muted">(optional)</span></label><input id="pf-other" value="${esc(v.other_names)}" autocomplete="additional-name"></div>
+      <div class="field"><label>Phone number</label><input id="pf-phone" value="${esc(v.phone)}" inputmode="tel" placeholder="0803 000 0000" autocomplete="tel"></div>
+      <div class="field"><label>Position</label><input id="pf-pos" value="${esc(v.position)}" placeholder="e.g. CEO, Managing Director, Lead Supervisor" list="pf-pos-list"><datalist id="pf-pos-list"><option>CEO</option><option>Managing Director</option><option>General Supervisor</option><option>Lead Supervisor</option><option>HR Manager</option><option>Recruiter</option><option>Operations Manager</option><option>Assistant</option></datalist></div>
+    </div>
+    <p class="hint" id="pf-err" style="color:var(--bad)"></p>
+    <div class="toolbar" style="justify-content:flex-end;margin-top:12px">${first ? "" : `<button class="btn" id="pf-cancel">Cancel</button>`}<button class="btn primary" id="pf-save">${first ? "Save and continue" : "Save"}</button></div>`;
+  let photo = v.photo_url;
+  const setAvatar = url => { photo = url; $("#pf-avatar").innerHTML = url ? `<img src="${esc(url)}" alt="">` : esc(initials); };
+  $("#pf-upload").onclick = () => $("#pf-file").click();
+  $("#pf-google")?.addEventListener("click", () => setAvatar(g.avatar));
+  $("#pf-file").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    $("#pf-upload").disabled = true; $("#pf-upload").textContent = "Uploading…";
+    try { setAvatar(await uploadAvatar(f)); toast("Photo uploaded", "ok"); }
+    catch (err) { $("#pf-err").textContent = "Photo upload failed: " + (err.message || err); }
+    $("#pf-upload").disabled = false; $("#pf-upload").textContent = "Upload a photo";
+  };
+  $("#pf-cancel")?.addEventListener("click", () => { $("#pf-scrim").hidden = true; });
+  $("#pf-save").onclick = async () => {
+    const body = { surname: $("#pf-surname").value.trim(), first_name: $("#pf-first").value.trim(), other_names: $("#pf-other").value.trim(), phone: $("#pf-phone").value.trim(), position: $("#pf-pos").value.trim(), photo_url: photo || "" };
+    if (!body.surname || !body.first_name) { $("#pf-err").textContent = "Surname and first name are required."; return; }
+    if (!body.phone) { $("#pf-err").textContent = "Phone number is required."; return; }
+    if (!body.position) { $("#pf-err").textContent = "Position is required."; return; }
+    $("#pf-err").textContent = ""; $("#pf-save").disabled = true; $("#pf-save").textContent = "Saving…";
+    const { data, error } = await SB.rpc("update_my_profile", { p: body });
+    $("#pf-save").disabled = false; $("#pf-save").textContent = first ? "Save and continue" : "Save";
+    if (error || !data) { $("#pf-err").textContent = error?.message || "The profile could not be saved. Reload and try again."; return; }
+    S.me.profile = data; S.me.name = data.name || S.me.name; S.me.avatarUrl = data.photo_url || S.me.avatarUrl; S.me.position = data.position || "";
+    paintRole(); $("#pf-scrim").hidden = true; toast("Profile saved", "ok"); loadMembers();
+  };
+}
+async function uploadAvatar(file) {
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("Choose a JPG, PNG or WebP image");
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That file is not a readable image")); i.src = URL.createObjectURL(file); });
+  const size = 256, c = document.createElement("canvas"); c.width = size; c.height = size;
+  const s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+  c.getContext("2d").drawImage(img, sx, sy, s, s, 0, 0, size, size);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+  const path = `${S.me.uid}/avatar.jpg`;
+  const { error } = await SB.storage.from("avatars").upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "3600" });
+  if (error) throw new Error(error.message);
+  const { data } = SB.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl + "?v=" + Date.now();
+}
+/* Team page (Admins) */
+function memberName(m) { return m.name || [m.first_name, m.other_names, m.surname].filter(Boolean).join(" ") || m.email; }
+function avatarHtml(m, cls = "avatar") { const n = memberName(m); const ini = n.split(/\s+/).map(x => x[0]).slice(0, 2).join("").toUpperCase() || "?"; return `<div class="${cls}">${m.photo_url ? `<img src="${esc(m.photo_url)}" alt="">` : esc(ini)}</div>`; }
+function when(ts) { if (!ts) return ""; try { return new Date(ts).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }); } catch { return ""; } }
+function renderTeam() {
+  const el = $("#v-team"); if (!S.me?.canEdit) { el.innerHTML = ""; return; }
+  const team = S.team || [], me = S.me.email;
+  const admins = team.filter(m => m.level === "editor" && m.status === "active").length;
+  const pending = team.filter(m => m.status === "pending"), invited = team.filter(m => m.status === "invited"), active = team.filter(m => m.status === "active" || m.status === "disabled");
+  const roleSel = (m, id) => `<select data-role-of="${esc(m.email)}" id="${id}" aria-label="Role"><option value="viewer" ${m.level === "viewer" ? "selected" : ""}>Employee</option><option value="editor" ${m.level === "editor" ? "selected" : ""}>Admin</option></select>`;
+  const row = m => {
+    const isMe = m.email.toLowerCase() === me, lastAdmin = m.level === "editor" && m.status === "active" && admins <= 1;
+    return `<div class="member ${isMe ? "me-row" : ""} ${m.status === "disabled" ? "off" : ""}">${avatarHtml(m)}
+      <div style="min-width:0"><b>${esc(memberName(m))} ${isMe ? '<span class="pill accent flat">you</span>' : ""} ${m.status === "disabled" ? '<span class="pill warn flat">disabled</span>' : ""}</b>
+        <small>${esc(m.position || "No position yet")} · ${esc(m.email)}${m.phone ? " · " + esc(m.phone) : ""}</small>
+        <small>${LEVEL_LABEL[m.level] || m.level} · joined ${when(m.joined_at || m.added_at)}${m.last_seen_at ? " · last seen " + when(m.last_seen_at) : ""}${m.profile_done ? "" : " · profile not completed"}</small></div>
+      <div class="acts">${roleSel(m, "")}${lastAdmin ? "" : m.status === "disabled" ? `<button class="btn small" data-enable="${esc(m.email)}">Enable</button>` : `<button class="btn small" data-disable="${esc(m.email)}">Disable</button>`}${lastAdmin ? `<span class="hint" style="margin:0">last Admin</span>` : `<button class="btn small danger" data-remove="${esc(m.email)}">Remove</button>`}</div></div>`;
+  };
+  el.innerHTML = `
+    <div class="team-grid">
+      <div class="card"><h2>Invite someone <small>they get an email with a personal link</small></h2>
+        <div class="fields">
+          <div class="field wide"><label>Google email address</label><input id="iv-email" type="email" placeholder="name@gmail.com" autocomplete="off"></div>
+          <div class="field"><label>Name <span class="muted">(optional)</span></label><input id="iv-name" placeholder="Used in the email greeting"></div>
+          <div class="field"><label>Role</label><select id="iv-level"><option value="viewer">Employee — read and download</option><option value="editor">Admin — full access, same as you</option></select></div>
+        </div>
+        <p class="hint" id="iv-err" style="color:var(--bad)"></p>
+        <div class="toolbar" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="iv-send">Send invitation</button></div></div>
+      <div class="card"><h2>Access requests <small>${pending.length ? pending.length + " waiting" : "none waiting"}</small></h2>
+        <div class="team-list">${pending.map(m => `<div class="member">${avatarHtml(m)}<div style="min-width:0"><b>${esc(memberName(m))}</b><small>${esc(m.email)} · asked for ${LEVEL_LABEL[m.requested_level] || "Employee"} · ${when(m.added_at)}</small></div>
+          <div class="acts"><select id="ap-${esc(m.email).replace(/[^a-z0-9]/gi, "_")}" aria-label="Approve as"><option value="viewer" ${m.requested_level !== "editor" ? "selected" : ""}>Employee</option><option value="editor" ${m.requested_level === "editor" ? "selected" : ""}>Admin</option></select><button class="btn small primary" data-approve="${esc(m.email)}">Approve</button><button class="btn small danger" data-remove="${esc(m.email)}">Decline</button></div></div>`).join("") || `<p class="muted">When someone signs in with Google without an invitation, their request appears here.</p>`}</div></div>
+    </div>
+    ${invited.length ? `<div class="card"><h2>Invitations sent <small>not yet accepted</small></h2><div class="team-list">${invited.map(m => `<div class="member">${avatarHtml(m)}<div style="min-width:0"><b>${esc(memberName(m))}</b><small>${esc(m.email)} · as ${LEVEL_LABEL[m.level]} · invited ${when(m.invited_at || m.added_at)}${m.invite_sent_at ? "" : " · email not confirmed sent"}</small></div>
+      <div class="acts"><button class="btn small" data-resend="${esc(m.email)}" data-level="${esc(m.level)}">Resend email</button><button class="btn small danger" data-remove="${esc(m.email)}">Cancel</button></div></div>`).join("")}</div></div>` : ""}
+    <div class="card"><h2>Team members <small>${active.length} · ${admins} Admin${admins === 1 ? "" : "s"}</small></h2><div class="team-list">${active.map(row).join("")}</div></div>`;
+  const busy = (b, on, label) => { if (!b) return; b.disabled = on; if (label) b.textContent = label; };
+  $("#iv-send").onclick = async () => {
+    const email = $("#iv-email").value.trim().toLowerCase(), name = $("#iv-name").value.trim(), level = $("#iv-level").value; $("#iv-err").textContent = "";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $("#iv-err").textContent = "Enter a valid email address."; return; }
+    busy($("#iv-send"), true, "Sending…");
+    const out = await callFunction("invite-member", { email, name, level });
+    busy($("#iv-send"), false, "Send invitation");
+    if (out.error && !out.status) { $("#iv-err").textContent = out.detail || out.error; logAct("bad", `Invitation to ${email} failed`, out.detail || out.error); return; }
+    if (out.status === "sent") { toast(`Invitation sent to ${email}`, "ok"); $("#iv-email").value = ""; $("#iv-name").value = ""; }
+    else { toast(`Invitation recorded, but the email failed: ${out.error || "unknown"}`, "warn"); logAct("warn", `Invitation email to ${email} failed`, out.error || ""); }
+    loadMembers();
+  };
+  el.querySelectorAll("[data-approve]").forEach(b => b.onclick = async () => {
+    const email = b.dataset.approve, level = $("#ap-" + email.replace(/[^a-z0-9]/gi, "_")).value; busy(b, true, "Approving…");
+    const { error } = await SB.rpc("admin_set_member", { p_email: email, p_level: level, p_status: "active" });
+    if (error) { toast(error.message, "bad"); busy(b, false, "Approve"); return; }
+    toast(`${email} approved as ${LEVEL_LABEL[level]}`, "ok"); loadMembers();
+  });
+  el.querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {
+    const email = b.dataset.remove; if (!confirm(`Remove ${email} from the desk? They will no longer be able to sign in.`)) return; busy(b, true, "Removing…");
+    const { error } = await SB.rpc("admin_remove_member", { p_email: email });
+    if (error) { toast(error.message, "bad"); busy(b, false, "Remove"); return; }
+    toast(`${email} removed`, "ok"); loadMembers();
+  });
+  el.querySelectorAll("[data-disable],[data-enable]").forEach(b => b.onclick = async () => {
+    const email = b.dataset.disable || b.dataset.enable, status = b.dataset.disable ? "disabled" : "active"; busy(b, true, "…");
+    const { error } = await SB.rpc("admin_set_member", { p_email: email, p_status: status });
+    if (error) { toast(error.message, "bad"); busy(b, false, status === "disabled" ? "Disable" : "Enable"); return; }
+    toast(`${email} ${status === "disabled" ? "disabled" : "enabled"}`, "ok"); loadMembers();
+  });
+  el.querySelectorAll("[data-role-of]").forEach(sel => sel.onchange = async () => {
+    const email = sel.dataset.roleOf, level = sel.value;
+    const { error } = await SB.rpc("admin_set_member", { p_email: email, p_level: level });
+    if (error) { toast(error.message, "bad"); loadMembers(); return; }
+    toast(`${email} is now ${LEVEL_LABEL[level]}`, "ok"); logAct("ok", `${email} set to ${LEVEL_LABEL[level]}`);
+    if (email.toLowerCase() === S.me.email) { S.me.canEdit = level === "editor"; S.me.level = level; S.canWrite = level !== "viewer"; paintRole(); if (!S.me.canEdit) setView("dashboard"); }
+    loadMembers();
+  });
+  el.querySelectorAll("[data-resend]").forEach(b => b.onclick = async () => {
+    busy(b, true, "Sending…"); const out = await callFunction("invite-member", { email: b.dataset.resend, level: b.dataset.level }); busy(b, false, "Resend email");
+    if (out.status === "sent") toast("Invitation email sent again", "ok"); else toast("Could not send: " + (out.detail || out.error || "unknown"), "bad");
+    loadMembers();
+  });
+}
+async function callFunction(name, body) {
+  const { data: { session } } = await SB.auth.getSession();
+  if (!session) return { error: "not_signed_in", detail: "Sign in again" };
+  try {
+    const r = await fetch(`${CFG.supabaseUrl}/functions/v1/${name}`, { method: "POST", headers: { Authorization: "Bearer " + session.access_token, apikey: CFG.supabaseKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const out = await r.json().catch(() => ({ error: `HTTP ${r.status}` })); if (!r.ok && !out.error) out.error = `HTTP ${r.status}`; return out;
+  } catch (e) { return { error: "network", detail: e.message }; }
+}
+$("#pf-scrim").addEventListener("click", e => { if (e.target === $("#pf-scrim") && $("#pf-cancel")) $("#pf-scrim").hidden = true; });
 
 /* ---------- boot (Supabase) ---------- */
 let SB = null;
@@ -1323,6 +1563,9 @@ async function boot() {
   $("#foot-sheet").href = SHEET_URL;
   if (!CFG.supabaseUrl || !CFG.supabaseKey || !window.supabase) { showGate("This copy is not configured.", "config.js must set supabaseUrl and supabaseKey."); setSync(false, "not configured"); return; }
   SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
+  const inv = new URLSearchParams(location.search).get("invite");
+  if (inv) { try { localStorage.setItem("fr_invite", inv); } catch {} try { history.replaceState(null, "", location.pathname + location.hash); } catch {} }
+  if (inv || safeGet("fr_invite")) gateState("invited");
   $("#gate-google").onclick = async () => { showGate("Opening Google sign-in…", ""); const { error } = await SB.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } }); if (error) showGate("Sign-in failed.", error.message); };
   // A sign-in that completes after the page loaded (the OAuth redirect) is picked up here, without a reload.
   SB.auth.onAuthStateChange((ev, sess) => { if (ev === "SIGNED_OUT") location.reload(); else if (ev === "SIGNED_IN" && sess && !S.me && !S.entering) enter(sess); });
@@ -1333,17 +1576,25 @@ async function boot() {
 async function enter(session) {
   if (S.me || S.entering) return; S.entering = true;
   showGate("Checking your access…", "");
-  const email = (session.user.email || "").toLowerCase();
-  const { data: level, error } = await SB.rpc("my_level");
-  if (error) { showGate("Could not check your access.", error.message + " — reload to try again."); setSync(false, "no access"); S.entering = false; return; }
-  if (!level) { showGate(`${email} is not on the members list.`, "Ask an editor to add you, then reload."); setSync(false, "no access"); S.entering = false; return; }
-  $("#gate").hidden = true;
-  S.me = { id: email, email, name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || email, avatarUrl: session.user.user_metadata?.avatar_url || "", canEdit: level === "editor" };
-  S.canWrite = level !== "viewer"; S.db = dbShim; S.user = {}; S.mcp = true; S.members = {};
-  SB.from("members").select("email,name,level").then(({ data }) => { for (const m of data || []) S.members[m.email.toLowerCase()] = m; });
   if (/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", location.pathname + "#" + S.view); } catch {} }
+  const email = (session.user.email || "").toLowerCase();
+  const g = googleProfile(session);
+  // Invited? This activates the invitation (matched by email) and stamps the visit.
+  let { data: me, error } = await SB.rpc("accept_invite");
+  if (error) { showGate("Could not check your access.", error.message + " — reload to try again."); setSync(false, "no access"); S.entering = false; return; }
+  try { localStorage.removeItem("fr_invite"); } catch {}
+  if (!me) { S.entering = false; gateState("signup", { email, g }); setSync(false, "no access"); return; }
+  if (me.status === "pending") { S.entering = false; gateState("pending", { me }); setSync(false, "awaiting approval"); return; }
+  if (me.status === "disabled") { S.entering = false; gateState("disabled", { me }); setSync(false, "no access"); return; }
+  if (me.status !== "active") { S.entering = false; gateState("error", { msg: `Account state "${me.status}" is not recognised.` }); return; }
+  const level = me.level;
+  S.me = { id: email, email, name: me.name || g.name || email, avatarUrl: me.photo_url || g.avatar || "", canEdit: level === "editor", level, position: me.position || "", profile: me, uid: session.user.id, g };
+  S.canWrite = level !== "viewer"; S.db = dbShim; S.user = {}; S.mcp = true; S.members = {}; S.team = [];
+  loadMembers();
+  $("#gate").hidden = true;
   paintRole(); setSync(true, "live");
-  logAct("ok", `Signed in as ${S.me.name} (${level})`);
+  logAct("ok", `Signed in as ${S.me.name} (${LEVEL_LABEL[level] || level})`);
+  if (!me.profile_done) openProfile(true);
   dbShim.doc("settings/scoring").onSnapshot(s => { if (s.exists) { const d = s.data(); S.settings = { ...DEFAULT_SETTINGS, location: d.location || DEFAULT_SETTINGS.location, qualification: d.qualification || DEFAULT_SETTINGS.qualification, availability: d.availability || DEFAULT_SETTINGS.availability, relocation: d.relocation ?? 10 }; } render(); }, () => {});
   dbShim.collection("roles").onSnapshot(s => { S.roles = {}; for (const d of s.docs) S.roles[d.id] = { id: d.id, ...d.data() }; render(); }, () => {});
   dbShim.collection("candidates").onSnapshot(s => { S.cands = {}; for (const d of s.docs) S.cands[d.id] = { id: d.id, ...d.data() }; S.loaded = true; setSync(true, "live"); render(); if (S.open && S.open !== "new" && !S.cands[S.open]) closeDrawer(); }, e => { setSync(false, "disconnected"); notice("bad", "Could not load candidates (" + (e.message || e.code) + "). Reload the page."); });
