@@ -475,7 +475,8 @@ function setView(v, opts = {}) {
   for (const t of document.querySelectorAll(".nav button")) t.setAttribute("aria-selected", t.dataset.view === v);
   for (const x of VIEWS) $("#v-" + x).hidden = x !== v;
   $("#page-title").textContent = TITLES[v][0]; $("#page-sub").textContent = TITLES[v][1];
-  try { history.replaceState(null, "", "#" + v); } catch {}
+  // Never overwrite the address while it still carries the sign-in tokens Google sent back.
+  if (!/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", "#" + v); } catch {} }
   window.scrollTo({ top: 0, behavior: "smooth" });
   render();
 }
@@ -1340,7 +1341,7 @@ async function enter(session) {
   S.me = { id: email, email, name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || email, avatarUrl: session.user.user_metadata?.avatar_url || "", canEdit: level === "editor" };
   S.canWrite = level !== "viewer"; S.db = dbShim; S.user = {}; S.mcp = true; S.members = {};
   SB.from("members").select("email,name,level").then(({ data }) => { for (const m of data || []) S.members[m.email.toLowerCase()] = m; });
-  if (location.hash && /access_token|refresh_token|error=/.test(location.hash)) history.replaceState(null, "", location.pathname);
+  if (/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", location.pathname + "#" + S.view); } catch {} }
   paintRole(); setSync(true, "live");
   logAct("ok", `Signed in as ${S.me.name} (${level})`);
   dbShim.doc("settings/scoring").onSnapshot(s => { if (s.exists) { const d = s.data(); S.settings = { ...DEFAULT_SETTINGS, location: d.location || DEFAULT_SETTINGS.location, qualification: d.qualification || DEFAULT_SETTINGS.qualification, availability: d.availability || DEFAULT_SETTINGS.availability, relocation: d.relocation ?? 10 }; } render(); }, () => {});
