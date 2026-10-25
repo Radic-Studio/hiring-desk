@@ -9,6 +9,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+const brandHtml = (title: string, bodyHtml: string, sub = "Operational communication") => `<!doctype html><html><body style="margin:0;background:#F6F8F7;font-family:Arial,sans-serif;color:#10211D"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px"><table role="presentation" width="600" style="max-width:600px;background:#fff;border:1px solid #DCE5E0;border-radius:12px;overflow:hidden"><tr><td style="background:#073F35;padding:24px 32px;color:#fff"><strong style="font-size:20px;letter-spacing:.02em">FUTURE READY</strong><div style="font-size:12px;color:#B9F2D8;margin-top:6px">${sub}</div></td></tr><tr><td style="padding:28px 32px;font-size:15px;line-height:1.55">${title ? `<h1 style="font-size:22px;margin:0 0 14px">${title}</h1>` : ""}${bodyHtml}</td></tr><tr><td style="padding:16px 32px;border-top:1px solid #DCE5E0;font-size:12px;color:#63736D">Future Ready Nig. Ltd. · Udeorji Street, Obiagu, Enugu, Nigeria</td></tr></table></td></tr></table></body></html>`;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 Deno.serve(async (req) => {
@@ -68,15 +69,13 @@ Sign in with the Google account that received this email (${email}); other accou
 If you were not expecting this, ignore this message and nothing will happen.
 
 Future Ready Nigeria Ltd`;
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#101828;max-width:600px">
-<p>Good day${name ? " " + esc(name) : ""},</p>
+  const html = brandHtml("You are invited", `<p>Good day${name ? " " + esc(name) : ""},</p>
 <p><strong>${esc(inviter)}</strong> has invited you to the <strong>Future Ready Group System</strong>, the tool Future Ready Nig. Ltd and its companies use to run their work.</p>
 <p>Your access: <strong>${esc(roleName)}</strong>.</p>
-<p><a href="${esc(link)}" style="display:inline-block;background:#2f5bff;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold">Accept invitation</a></p>
-<p style="font-size:12px;color:#667085">Or copy this link: ${esc(link)}</p>
+<p style="margin:24px 0"><a href="${esc(link)}" style="display:inline-block;background:#0D7A62;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px">Accept invitation</a></p>
+<p style="font-size:13px;color:#63736D">If the button does not work, use this link:<br><a href="${esc(link)}" style="color:#0D7A62">${esc(link)}</a></p>
 <p>Sign in with the Google account that received this email (<strong>${esc(email)}</strong>); other accounts will not be recognised. You will be asked for your name, phone number, position and a photo the first time.</p>
-<p style="color:#667085">If you were not expecting this, ignore this message and nothing will happen.</p>
-<p>Future Ready Nigeria Ltd</p></div>`;
+<p style="color:#63736D">If you were not expecting this, ignore this message and nothing will happen.</p>`, "Team invitation");
 
   let status: "sent" | "failed" = "failed", errText = "";
   try {

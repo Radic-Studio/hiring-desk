@@ -387,45 +387,50 @@ function moveStock(m) {
 
 /* ---------- PDFs (jsPDF + autotable) ---------- */
 function docBase(title, number, dateStr) {
+  // Letterhead per the Brand System v2 document templates (07_Email_Documents): green top bar, company lockup, ink title, muted meta.
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "mm", format: "a4" }); const cfg = P.cfg;
-  doc.setFillColor(47, 91, 255); doc.rect(0, 0, 210, 6, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(16, 24, 40); doc.text(cfg.business_name || "", 14, 20);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(102, 112, 133);
-  const lines = [cfg.address, [cfg.phone, cfg.email].filter(Boolean).join(" · ")].filter(Boolean); lines.forEach((l, i) => doc.text(l, 14, 26 + i * 4.5));
-  doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(47, 91, 255); doc.text(title, 196, 20, { align: "right" });
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(16, 24, 40); doc.text(number, 196, 27, { align: "right" }); doc.text(dateStr, 196, 32, { align: "right" });
-  doc.setDrawColor(228, 231, 236); doc.line(14, 38, 196, 38);
+  doc.setFillColor(13, 122, 98); doc.rect(0, 0, 210, 3, "F");
+  const logo = (window.FR_LOGOS || {})[S.company] || (window.FR_LOGOS || {}).group;
+  let y = 14;
+  if (logo) { const w = 66, h = w * logo.h / logo.w; try { doc.addImage(logo.data, "PNG", 12, 9, w, h); } catch {} y = 9 + h + 4; }
+  else { doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(16, 33, 29); doc.text(cfg.business_name || "", 14, 20); y = 26; }
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(99, 115, 109);
+  const lines = [cfg.business_name !== FR.companyName(S.company) ? cfg.business_name : "", cfg.address, [cfg.phone, cfg.email].filter(Boolean).join(" · ")].filter(Boolean); lines.forEach((l, i) => doc.text(l, 14, y + i * 4.2));
+  doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(16, 33, 29); doc.text(title, 196, 22, { align: "right" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(99, 115, 109); doc.text("# " + number, 196, 29, { align: "right" }); doc.text(dateStr, 196, 34, { align: "right" });
+  doc.setDrawColor(220, 229, 224); doc.line(14, 40, 196, 40);
   return doc;
 }
 function customerBlock(doc, j, y) {
   const c = custOf(j) || { name: custName(j) };
-  doc.setFontSize(9); doc.setTextColor(102, 112, 133); doc.text("TO", 14, y);
-  doc.setFontSize(11); doc.setTextColor(16, 24, 40); doc.setFont("helvetica", "bold"); doc.text(c.name || "", 14, y + 5.5); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+  doc.setFontSize(9); doc.setTextColor(99, 115, 109); doc.text("CLIENT", 14, y);
+  doc.setFontSize(11); doc.setTextColor(16, 33, 29); doc.setFont("helvetica", "bold"); doc.text(c.name || "", 14, y + 5.5); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
   [c.phone, c.email, c.address].filter(Boolean).forEach((l, i) => doc.text(String(l), 14, y + 10.5 + i * 4.5));
-  if (j.title) { doc.setFontSize(9); doc.setTextColor(102, 112, 133); doc.text("JOB", 110, y); doc.setFontSize(10.5); doc.setTextColor(16, 24, 40); doc.text(doc.splitTextToSize(j.title, 86), 110, y + 5.5); }
+  if (j.title) { doc.setFontSize(9); doc.setTextColor(99, 115, 109); doc.text("JOB", 110, y); doc.setFontSize(10.5); doc.setTextColor(16, 33, 29); doc.text(doc.splitTextToSize(j.title, 86), 110, y + 5.5); }
   return y + 26;
 }
 function itemsTable(doc, j, y) {
   const specs = Object.entries(j.specs || {}).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(" · ");
   doc.autoTable({ startY: y, head: [["Description", "Qty", "Unit", "Unit price", "Total"]], body: (j.items || []).map(i => [i.description, String(N(i.qty)), i.unit || "", money(i.unit_price).replace("₦", "N"), money(i.total).replace("₦", "N")]),
-    styles: { fontSize: 9.5, cellPadding: 2.5, textColor: [16, 24, 40] }, headStyles: { fillColor: [16, 24, 40], textColor: 255 }, columnStyles: { 1: { halign: "right", cellWidth: 18 }, 2: { cellWidth: 20 }, 3: { halign: "right", cellWidth: 30 }, 4: { halign: "right", cellWidth: 32 } }, margin: { left: 14, right: 14 } });
+    styles: { fontSize: 9.5, cellPadding: 2.8, textColor: [16, 33, 29], lineColor: [220, 229, 224], lineWidth: 0.2 }, headStyles: { fillColor: [246, 248, 247], textColor: [99, 115, 109], fontStyle: "bold" }, alternateRowStyles: { fillColor: [255, 255, 255] }, columnStyles: { 1: { halign: "right", cellWidth: 18 }, 2: { cellWidth: 20 }, 3: { halign: "right", cellWidth: 30 }, 4: { halign: "right", cellWidth: 32 } }, margin: { left: 14, right: 14 } });
   let yy = doc.lastAutoTable.finalY + 6;
   const t = calcTotals(j.items || [], j.discount, P.cfg.vat_pct);
   const rows = [["Subtotal", money(t.subtotal)], ...(N(j.discount) ? [["Discount", "- " + money(j.discount)]] : []), ...(N(P.cfg.vat_pct) ? [[`VAT ${N(P.cfg.vat_pct)}%`, money(t.vat)]] : []), ["Total", money(j.total)]];
   doc.setFontSize(10);
-  rows.forEach(([k, v], i) => { const bold = k === "Total"; doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setTextColor(bold ? 47 : 102, bold ? 91 : 112, bold ? 255 : 133); doc.text(k, 150, yy + i * 6, { align: "right" }); doc.setTextColor(16, 24, 40); doc.text(v.replace("₦", "N"), 196, yy + i * 6, { align: "right" }); });
-  yy += rows.length * 6 + 4;
+  rows.forEach(([k, v], i) => { const bold = k === "Total"; doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(bold ? 13 : 10); doc.setTextColor(99, 115, 109); doc.text(k.toUpperCase(), 150, yy + i * 6.5, { align: "right" }); doc.setTextColor(16, 33, 29); doc.text(v.replace("₦", "N"), 196, yy + i * 6.5, { align: "right" }); doc.setFontSize(10); });
+  yy += rows.length * 6.5 + 4;
   if (specs) { doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(102, 112, 133); doc.text(doc.splitTextToSize("Specification: " + specs, 180), 14, yy); yy += 6 + Math.ceil(specs.length / 110) * 4; }
   if (j.description) { doc.setFontSize(9.5); doc.setTextColor(16, 24, 40); const ls = doc.splitTextToSize(j.description, 180); doc.text(ls, 14, yy); yy += ls.length * 4.5 + 2; }
   return yy;
 }
 function footerBlock(doc, lines, y) {
-  doc.setFontSize(8.5); doc.setTextColor(102, 112, 133);
+  doc.setFontSize(8.5); doc.setTextColor(99, 115, 109);
   lines.filter(Boolean).forEach(l => { const ls = doc.splitTextToSize(l, 182); doc.text(ls, 14, y); y += ls.length * 4 + 1.5; });
-  doc.setFontSize(8); doc.text(`Prepared by ${S.me?.name || ""} · ${new Date().toLocaleString("en-NG")}`, 14, 290);
+  doc.setDrawColor(220, 229, 224); doc.line(14, 282, 196, 282);
+  doc.setFontSize(8); doc.text(`${P.cfg.business_name} · ${P.cfg.address}${P.cfg.phone ? " · " + P.cfg.phone : ""}`, 14, 287); doc.text(`Prepared by ${S.me?.name || ""} · ${new Date().toLocaleString("en-NG")}`, 14, 291);
 }
 function quotePdf(j) {
-  const doc = docBase("QUOTATION", j.number, "Date: " + when(j.quoted_at || j.created_at)); let y = customerBlock(doc, j, 46); y = itemsTable(doc, j, y + 2);
+  const doc = docBase("QUOTE", j.number, "Date: " + when(j.quoted_at || j.created_at)); let y = customerBlock(doc, j, 46); y = itemsTable(doc, j, y + 2);
   const dep = N(j.total) * N(j.deposit_pct) / 100; const until = new Date(Date.parse(j.quoted_at || j.created_at || Date.now()) + N(j.valid_days) * 864e5);
   footerBlock(doc, [`Deposit to start: ${money(dep).replace("₦", "N")} (${N(j.deposit_pct)}%). Balance: ${money(N(j.total) - dep).replace("₦", "N")} before delivery.`, `This quotation is valid until ${when(until.toISOString())} (${N(j.valid_days)} days).`, P.cfg.bank_name ? `Bank: ${P.cfg.bank_name} · ${P.cfg.account_name} · ${P.cfg.account_number}` : "", P.cfg.terms], y + 4);
   return doc;
@@ -434,14 +439,14 @@ function invoicePdf(j) {
   const doc = docBase("INVOICE", j.number, "Date: " + when(j.accepted_at || j.quoted_at || j.created_at)); let y = customerBlock(doc, j, 46); y = itemsTable(doc, j, y + 2);
   const paid = paidOf(j), bal = balanceOf(j);
   doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(102, 112, 133); doc.text("Paid to date", 150, y + 2, { align: "right" }); doc.setTextColor(16, 24, 40); doc.text(money(paid).replace("₦", "N"), 196, y + 2, { align: "right" });
-  doc.setFont("helvetica", "bold"); doc.setTextColor(bal > 0 ? 217 : 16, bal > 0 ? 45 : 24, bal > 0 ? 32 : 40); doc.text("Balance due", 150, y + 8, { align: "right" }); doc.text(money(bal).replace("₦", "N"), 196, y + 8, { align: "right" });
+  doc.setFont("helvetica", "bold"); doc.setTextColor(bal > 0 ? 192 : 16, bal > 0 ? 57 : 33, bal > 0 ? 43 : 29); doc.text("Balance due", 150, y + 8, { align: "right" }); doc.text(money(bal).replace("₦", "N"), 196, y + 8, { align: "right" });
   footerBlock(doc, [j.due_date ? `Delivery: ${when(j.due_date)}.` : "", P.cfg.bank_name ? `Pay to: ${P.cfg.bank_name} · ${P.cfg.account_name} · ${P.cfg.account_number}. Use ${j.number} as reference.` : "", P.cfg.terms], y + 16);
   return doc;
 }
 function receiptPdf(j, p) {
   const doc = docBase("RECEIPT", p.receipt_no, "Date: " + when(p.paid_at)); let y = customerBlock(doc, j, 46);
   doc.setFontSize(11); doc.setTextColor(16, 24, 40); doc.text(`Received with thanks the sum of`, 14, y + 2);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(47, 91, 255); doc.text(money(p.amount).replace("₦", "N"), 14, y + 13);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(24); doc.setTextColor(13, 122, 98); doc.text(money(p.amount).replace("₦", "N"), 14, y + 13);
   doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(16, 24, 40);
   [`By ${METHOD[p.method] || p.method}${p.note ? " · " + p.note : ""}`, `For job ${j.number}${j.title ? ": " + j.title : ""}`, `Job total ${money(j.total).replace("₦", "N")} · paid to date ${money(paidOf(j)).replace("₦", "N")} · balance ${money(balanceOf(j)).replace("₦", "N")}`].forEach((l, i) => doc.text(l, 14, y + 22 + i * 6));
   doc.setDrawColor(228, 231, 236); doc.line(130, y + 52, 196, y + 52); doc.setFontSize(9); doc.setTextColor(102, 112, 133); doc.text(`Received by ${S.me?.name || p.received_by || ""}`, 130, y + 57);

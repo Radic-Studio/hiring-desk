@@ -14,7 +14,8 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 | `app/modules/press.js` | The Press module: customers, rate card and letterhead, jobs (quote → accepted → design → proof → print → finishing → ready → delivered), quote/invoice/receipt PDFs (jsPDF), payments with receipt numbers, materials stock with movements, job files. Email with PDF attached through `send-doc`. |
 | `app/modules/people.js` | The People module: staff directory with details, documents (private `staff-docs` bucket, signed links) and leave (requests, approvals, who is away). A hired candidate becomes a staff record from the candidate drawer. |
 | `app/shell.js` | Sign-in gate and sign-up, company switcher, navigation and routing (`#/<company>/<view>`), profile, Team page. Loaded last; calls `boot()`. |
-| `app/styles.css` | All styles. |
+| `app/styles.css` | All styles. Tokens at the top come from the Brand System v2 (`app/brand/design_tokens.json`). |
+| `app/brand/` | Brand assets: master and sub-brand lockups/symbols/app icons (SVG masters, never redrawn), icon sprite, email banners, `logos.js` (rasterised lockups for PDF letterheads), `BRAND_GUIDELINES.pdf`. |
 | `config.js` | Publishable settings: Supabase URL and publishable key, form link, sheet link. No secrets. |
 | `netlify.toml` | Static publish config and security headers. |
 | `supabase/migrations/*.sql` | Database schema, row-level security, defaults. Already applied to the project. |
@@ -53,3 +54,9 @@ Employee (`viewer`): read and download. Admin (`editor`): everything, including 
 ## Updating
 
 Edit `index.html`, commit, push. Netlify deploys in under a minute. Database changes go in a new file under `supabase/migrations/` and are applied with the Supabase CLI or dashboard.
+
+## Brand
+
+Visual rules come from the Future Ready Brand System v2 (`app/brand/BRAND_GUIDELINES.pdf`, tokens in `app/brand/design_tokens.json`). Future Green is the only action colour; Press Blue and Events Coral mark company context (switcher, header badge, PDF lockup) and never success or error. Logos are the supplied SVG masters; the wordmark is outlined artwork and is not typeset. Fonts: Sora (display), IBM Plex Sans (body), IBM Plex Mono (numbers).
+
+Not yet implemented from the behaviour spec (`06_UI_UX/UI_UX_BEHAVIOR_SPEC.md` in the kit): collapsible 80 px sidebar at 900–1119 px, dirty-form guard on company switch and drawer close, typed-name confirmation for permanent role deletion, drag-and-drop on the Press board, "Closed" stage after Delivered, table-to-card conversion for People and Press tables under 720 px, skeleton loading states.

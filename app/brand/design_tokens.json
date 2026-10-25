@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "name": "Future Ready Brand System",
+    "version": "2.0",
+    "date": "2026-10-25",
+    "status": "Working master pending formal approval"
+  },
+  "color": {
+    "brand": {
+      "primary": "#0D7A62",
+      "primaryHover": "#095D4B",
+      "primaryPressed": "#073F35",
+      "soft": "#E5F8EF",
+      "ink": "#10211D",
+      "canvas": "#F6F8F7",
+      "surface": "#FFFFFF",
+      "border": "#DCE5E0",
+      "mutedText": "#63736D"
+    },
+    "company": {
+      "press": "#2F5BFF",
+      "pressDark": "#163A6F",
+      "pressSoft": "#E9EEFF",
+      "events": "#E85D3F",
+      "eventsDark": "#9E3825",
+      "eventsSoft": "#FCEBE6"
+    },
+    "semantic": {
+      "success": "#157F3B",
+      "successSoft": "#E6F5EA",
+      "warning": "#A65F00",
+      "warningSoft": "#FFF1D6",
+      "error": "#C0392B",
+      "errorSoft": "#FDE8E5",
+      "info": "#275DD6",
+      "infoSoft": "#EAF0FF",
+      "violet": "#6941C6",
+      "violetSoft": "#F0EAFE"
+    },
+    "neutral": {
+      "50": "#F8FAF9",
+      "100": "#F1F4F2",
+      "200": "#E3E9E6",
+      "300": "#CDD7D2",
+      "400": "#98A8A1",
+      "500": "#6B7C75",
+      "600": "#4D5E57",
+      "700": "#34453F",
+      "800": "#20312C",
+      "900": "#10211D"
+    }
+  },
+  "typography": {
+    "brandWordmark": "Outlined master artwork; do not typeset manually",
+    "displayStack": "Sora, Inter Display, system-ui, sans-serif",
+    "bodyStack": "IBM Plex Sans, Inter, system-ui, sans-serif",
+    "monoStack": "IBM Plex Mono, ui-monospace, SFMono-Regular, monospace",
+    "scale": {
+      "displayXL": 48,
+      "displayL": 40,
+      "h1": 32,
+      "h2": 24,
+      "h3": 20,
+      "bodyL": 16,
+      "body": 14,
+      "bodyS": 13,
+      "caption": 12,
+      "micro": 11
+    },
+    "lineHeight": {
+      "display": 1.15,
+      "heading": 1.25,
+      "body": 1.5,
+      "compact": 1.35
+    }
+  },
+  "spacing": {
+    "unit": 4,
+    "scale": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      32,
+      40,
+      48,
+      64,
+      80,
+      96
+    ]
+  },
+  "radius": {
+    "xs": 6,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 20,
+    "pill": 999
+  },
+  "shadow": {
+    "sm": "0 1px 2px rgba(16,33,29,.06)",
+    "md": "0 8px 24px rgba(16,33,29,.10)",
+    "drawer": "0 16px 50px rgba(16,33,29,.18)"
+  },
+  "layout": {
+    "sidebar": 248,
+    "sidebarCollapsed": 80,
+    "drawer": 560,
+    "contentMax": 1440,
+    "breakpoints": {
+      "mobile": 480,
+      "cards": 720,
+      "nav": 900,
+      "compact": 1120,
+      "wide": 1440
+    }
+  },
+  "motion": {
+    "fast": 120,
+    "base": 180,
+    "slow": 240,
+    "drawer": 260,
+    "easing": "cubic-bezier(.2,.8,.2,1)"
+  },
+  "icon": {
+    "grid": 24,
+    "stroke": 1.75,
+    "sizes": [
+      16,
+      20,
+      24,
+      32
+    ]
+  },
+  "focus": {
+    "ring": "0 0 0 3px rgba(13,122,98,.24)",
+    "outline": "2px solid #0D7A62",
+    "offset": 2
+  }
+}

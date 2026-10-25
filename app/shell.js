@@ -29,7 +29,39 @@ function buildNav() {
   const main = $("main");
   for (const m of Object.values(FR.modules)) for (const v of m.views) if (!$("#v-" + v.id)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v.id; s.hidden = true; main.appendChild(s); }
   if (!$("#v-team")) { const s = document.createElement("section"); s.className = "view"; s.id = "v-team"; s.hidden = true; main.appendChild(s); }
-  paintCompanySwitch(); paintTeamBadge();
+  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintMobileNav();
+}
+const CO_ICON = { press: "./app/brand/app_icon_press.svg", events: "./app/brand/app_icon_events.svg" };
+function paintCompanyBadge() {
+  const b = $("#co-badge"); if (!b) return; const c = S.companies.find(x => x.id === S.company);
+  document.body.dataset.company = ["press", "events"].includes(S.company) ? S.company : "group";
+  if (!c) { b.hidden = true; return; }
+  b.hidden = false; b.innerHTML = `${CO_ICON[c.id] ? `<img src="${CO_ICON[c.id]}" alt="">` : ""}${esc(c.short_name)}`; b.title = c.name;
+}
+/* phones: five-item bottom bar (first four views of the active module + More), the rest in a sheet */
+function paintMobileNav() {
+  const btns = [...document.querySelectorAll("#tabs button[data-view]")]; btns.forEach(b => b.classList.remove("bn"));
+  const mod = companyModules(S.company).find(m => m.views.some(v => v.id === S.view)) || companyModules(S.company)[0];
+  const first = mod ? mod.views.slice(0, 4).map(v => v.id) : [];
+  btns.filter(b => first.includes(b.dataset.view)).forEach(b => b.classList.add("bn"));
+  let more = $("#tab-more");
+  if (!more) { more = document.createElement("button"); more.id = "tab-more"; more.setAttribute("role", "tab"); more.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span class="lbl">More</span>'; more.onclick = openMoreSheet; $("#tabs").appendChild(more); }
+  more.classList.add("bn"); more.setAttribute("aria-selected", "false");
+}
+function openMoreSheet() {
+  let sh = $("#more-sheet"); const hide = () => { $("#more-sheet")?.remove(); $("#scrim").classList.remove("open"); setTimeout(() => { if (!$("#drawer").classList.contains("open")) $("#scrim").hidden = true; }, 200); };
+  if (sh) { hide(); return; }
+  sh = document.createElement("div"); sh.className = "more-sheet"; sh.id = "more-sheet";
+  const comps = S.companies.filter(c => c.active && roleIn(c.id));
+  sh.innerHTML = `${comps.length > 1 ? `<div class="grp"><h4>Company</h4><select id="more-co">${comps.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>` : ""}
+    ${companyModules(S.company).map(m => `<div class="grp"><h4>${esc(m.name)}</h4>${m.views.map(v => `<button class="item" data-go="${v.id}" aria-selected="${v.id === S.view}">${v.icon || ""}<span>${esc(v.nav || v.title)}</span></button>`).join("")}</div>`).join("")}
+    ${canManageTeam() ? `<div class="grp"><h4>Group</h4><button class="item" data-go="team" aria-selected="${S.view === "team"}"><span>Team</span></button></div>` : ""}
+    <div class="grp"><h4>Account</h4><button class="item" id="more-profile"><span>${esc(S.me?.name || "")} · edit profile</span></button><button class="item" id="more-out"><span>Sign out</span></button></div>`;
+  document.body.appendChild(sh); $("#scrim").hidden = false; requestAnimationFrame(() => $("#scrim").classList.add("open")); $("#scrim").onclick = hide;
+  sh.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { hide(); setView(b.dataset.go); });
+  $("#more-co")?.addEventListener("change", e => { hide(); switchCompany(e.target.value); });
+  $("#more-profile").onclick = () => { hide(); openProfile(false); };
+  $("#more-out").onclick = async () => { await SB().auth.signOut(); location.reload(); };
 }
 function paintCompanySwitch() {
   const el = $("#company-switch"); if (!el) return;
@@ -63,6 +95,7 @@ function setView(v, opts = {}) {
   $("#dl-btn").hidden = !(d.module && FR.modules[d.module]?.headerDownload);
   if (!/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", `#/${S.company}/${v}`); } catch {} }
   window.scrollTo({ top: 0, behavior: "smooth" });
+  paintMobileNav();
   FR.render();
 }
 FR.setView = setView;
