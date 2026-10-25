@@ -11,12 +11,14 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 | `index.html` | Shell markup only (sidebar, header, modals). |
 | `app/core.js` | Shared state (`FR.S`), helpers, activity log, Supabase document-store shim, module registry. Loaded first. |
 | `app/modules/hiring.js` | The Hiring module: scoring, views, import, downloads, email. Registers itself with `FR.registerModule`. Works on the active company's data. |
+| `app/modules/press.js` | The Press module: customers, rate card and letterhead, jobs (quote → accepted → design → proof → print → finishing → ready → delivered), quote/invoice/receipt PDFs (jsPDF), payments with receipt numbers, materials stock with movements, job files. Email with PDF attached through `send-doc`. |
 | `app/modules/people.js` | The People module: staff directory with details, documents (private `staff-docs` bucket, signed links) and leave (requests, approvals, who is away). A hired candidate becomes a staff record from the candidate drawer. |
 | `app/shell.js` | Sign-in gate and sign-up, company switcher, navigation and routing (`#/<company>/<view>`), profile, Team page. Loaded last; calls `boot()`. |
 | `app/styles.css` | All styles. |
 | `config.js` | Publishable settings: Supabase URL and publishable key, form link, sheet link. No secrets. |
 | `netlify.toml` | Static publish config and security headers. |
 | `supabase/migrations/*.sql` | Database schema, row-level security, defaults. Already applied to the project. |
+| `supabase/functions/send-doc/index.ts` | Edge function: emails a company document (quote, invoice, receipt) with a PDF attachment through the Gmail relay; caller must have write access to the company. |
 | `supabase/functions/invite-member/index.ts` | Edge function behind the Team page's Send invitation button: records the invitation (as the caller, so the database checks they are an Admin) and emails the personal link through the relay. Already deployed. |
 | `supabase/functions/send-email/index.ts` | Edge function that checks the sender and candidate, then relays the email to the Apps Script, which sends it from Gmail. Already deployed. |
 | `apps-script/Code.gs` | Google Apps Script in the sheet: hourly form-reply ingest and sheet mirror, plus the Gmail relay the desk sends email through. |
@@ -35,6 +37,10 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 ## People
 
 `staff` (home company plus `companies[]` for people who also work elsewhere; `member_email` links a record to a login), `staff_documents` (metadata; files in the private `staff-docs` bucket under `<company>/<staff>/`), `leave_requests` (status pending → approved/declined through `leave_decide()`, which refuses deciding your own request). Admins and Managers of the home company edit; everyone with a role in the company reads; a linked member requests leave for themself.
+
+## Press
+
+`press_customers`, `press_rate_items`, `press_jobs` (one record from quote to delivery; `number` like `FRP-Q-0001` from `next_number()`), `press_payments` (receipt numbers `FRP-R-0001`), `press_materials` + `press_material_moves` (a trigger keeps the quantity), `press_files` (private `press-files` bucket), `company_settings` (module `press`: letterhead, bank, terms, prefix, deposit %, VAT %). Staff and up write; Managers and Admins manage the rate card and materials; Admins edit the letterhead.
 
 ## Adding a module
 

@@ -2,7 +2,7 @@
  * Future Ready Hiring Desk: Google-side helper for the standalone (Supabase) build. One script, three jobs:
  *  A) every hour, pull new Google Form responses into the database
  *  B) every hour, mirror the database into this spreadsheet (one tab per role + Second Interview, Issues, Call Log, Sync Info)
- *  C) on demand, send the desk's outreach and interview emails from this Google account (Gmail)
+ *  C) on demand, send the system's emails from this Google account (Gmail): candidate outreach, invitations, quotes, invoices and receipts (with PDF attachments)
  *
  * Install (once):
  *  1. Open the "Future Ready Candidates" spreadsheet → Extensions → Apps Script → replace the contents with this file → Save.
@@ -61,7 +61,12 @@ function doPost(e) {
   const remaining = MailApp.getRemainingDailyQuota();
   if (remaining < 1) return out({ ok: false, error: "Gmail daily sending limit reached; try again tomorrow", remaining });
   try {
-    GmailApp.sendEmail(to, subject, text, { htmlBody: html || undefined, name: SENDER_NAME });
+    const opts = { htmlBody: html || undefined, name: String(p.senderName || SENDER_NAME).slice(0, 80) };
+    if (Array.isArray(p.attachments) && p.attachments.length) {
+      opts.attachments = p.attachments.slice(0, 5).map(a => Utilities.newBlob(Utilities.base64Decode(String(a.base64 || "")), String(a.mime || "application/octet-stream"), String(a.name || "attachment").slice(0, 120)));
+    }
+    if (p.replyTo && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(p.replyTo))) opts.replyTo = String(p.replyTo);
+    GmailApp.sendEmail(to, subject, text, opts);
     return out({ ok: true, id: null, remaining: remaining - 1 });
   } catch (err) { return out({ ok: false, error: String(err.message || err), remaining }); }
 }
