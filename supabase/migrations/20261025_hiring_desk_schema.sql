@@ -1,0 +1,15 @@
+-- Applied 2026-10-25 via the Supabase connector. Kept here as the source of record.
+-- See the Supabase dashboard → Database → Migrations for the live history (hiring_desk_schema, harden_functions).
+-- Full text of both migrations is in the project's migration history; this file documents the schema shape.
+--
+-- Tables: members(email pk, level member_level, name, added_at)
+--         roles(id pk, name, qual_weight, top, second, "order", status open|closed, source, created_at/by, closed_at/by, reopened_at, final_stats jsonb)
+--         candidates(id pk, role fk, sn, name, phone, email, address, qualification, location, state, status pending|awaiting|attempted|contacted,
+--                    attempts, mode, availability, relocation, manual, adjust, notes, portfolio, next_action, last_contact, last_by, history jsonb,
+--                    self_reported, form_response_at, form_role, emailed_at, last_email_status, last_email_at, last_email_error, outreach jsonb,
+--                    interview jsonb, added_manually, added_by, imported_from, updated_at)
+--         issues(id pk, candidate_id fk, name, role, issue, detail, action, resolved, resolution, resolved_at, resolved_by)
+--         settings(id pk, data jsonb, updated_at)
+-- Functions: my_level(), can_write(), is_editor()  (search_path pinned; my_level not executable by anon)
+-- RLS: members read if member / write if editor; roles, candidates, issues read if member / write if contributor or editor;
+--      settings read if member / write if editor and id in (scoring, outreach, interviewEmail). formIngest is written by the service role only.
