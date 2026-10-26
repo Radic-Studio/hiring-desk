@@ -1,6 +1,6 @@
 -- Future Ready Group System: complete database schema snapshot (structure only: no data, no secrets).
 
--- Generated 2026-10-26 14:18 UTC from the live project by supabase/schema/generate_snapshot.sql.
+-- Generated 2026-10-26 14:27 UTC from the live project by supabase/schema/generate_snapshot.sql.
 
 -- Restore: run this whole file in the SQL editor of an EMPTY Supabase project, then load data with fr_restore() (see docs/RESTORE_RUNBOOK.md).
 
@@ -2161,9 +2161,41 @@ create policy "staff photos by managers delete" on storage.objects as PERMISSIVE
 create policy "staff photos by managers insert" on storage.objects as PERMISSIVE for INSERT to authenticated with check (((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = 'staff'::text) AND public.can_manage_company((storage.foldername(name))[2])));
 create policy "staff photos by managers update" on storage.objects as PERMISSIVE for UPDATE to authenticated using (((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = 'staff'::text) AND public.can_manage_company((storage.foldername(name))[2])));
 
--- table rights the API never uses (stage9c)
+-- table rights for the API roles, exactly as on live (includes the stage9c removal of TRUNCATE, TRIGGER, REFERENCES)
 
-revoke truncate, trigger, references on all tables in schema public from anon, authenticated;
+revoke all on table public.app_config from anon, authenticated;
+revoke all on table public.candidates from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.candidates to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.candidates to authenticated;
+revoke all on table public.companies from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.companies to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.companies to authenticated;
+revoke all on table public.company_members from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.company_members to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.company_members to authenticated;
+revoke all on table public.company_settings from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.company_settings to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.company_settings to authenticated;
+revoke all on table public.conflicts from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.conflicts to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.conflicts to authenticated;
+revoke all on table public.counters from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.counters to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.counters to authenticated;
+revoke all on table public.customer_request_files from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_request_files to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_request_files to authenticated;
+revoke all on table public.customer_request_messages from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_request_messages to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_request_messages to authenticated;
+revoke all on table public.customer_requests from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_requests to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.customer_requests to authenticated;
+revoke all on table public.deletions from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.deletions to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.deletions to authenticated;
+revoke all on table public.issues from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.issues to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.issues to authenticated;
+revoke all on table public.leave_requests from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.leave_requests to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.leave_requests to authenticated;
+revoke all on table public.member_invites from anon, authenticated;
+revoke all on table public.members from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.members to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.members to authenticated;
+revoke all on table public.op_receipts from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.op_receipts to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.op_receipts to authenticated;
+revoke all on table public.ops_log from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.ops_log to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.ops_log to authenticated;
+revoke all on table public.portal_profiles from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.portal_profiles to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.portal_profiles to authenticated;
+revoke all on table public.press_customers from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_customers to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_customers to authenticated;
+revoke all on table public.press_files from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_files to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_files to authenticated;
+revoke all on table public.press_jobs from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_jobs to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_jobs to authenticated;
+revoke all on table public.press_material_moves from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_material_moves to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_material_moves to authenticated;
+revoke all on table public.press_materials from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_materials to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_materials to authenticated;
+revoke all on table public.press_payments from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_payments to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_payments to authenticated;
+revoke all on table public.press_rate_items from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_rate_items to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.press_rate_items to authenticated;
+revoke all on table public.roles from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.roles to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.roles to authenticated;
+revoke all on table public.settings from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.settings to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.settings to authenticated;
+revoke all on table public.staff from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff to authenticated;
+revoke all on table public.staff_documents from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff_documents to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff_documents to authenticated;
+revoke all on table public.staff_private from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff_private to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.staff_private to authenticated;
+revoke all on table public.sync_runs from anon, authenticated; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.sync_runs to anon; grant DELETE, INSERT, MAINTAIN, SELECT, UPDATE on table public.sync_runs to authenticated;
+
+alter default privileges in schema public revoke truncate, trigger, references on tables from anon, authenticated;
 
 -- realtime
 

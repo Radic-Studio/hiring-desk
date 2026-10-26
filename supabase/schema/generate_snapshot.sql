@@ -49,6 +49,13 @@ fgrants as (   -- functions: who may call them (Postgres default is PUBLIC; the 
                         where x.privilege_type = 'EXECUTE' and (x.grantee = 0 or r.rolname in ('anon', 'authenticated', 'service_role'))), ''), E'\n' order by n.nspname, p.proname) t
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname in (select s from sch) and p.prokind = 'f' and not exists (select 1 from pg_depend dp where dp.objid = p.oid and dp.deptype = 'e')),
+tgrants as (   -- tables: exactly the rights anon and authenticated hold on live (some tables, e.g. app_config, have none)
+  select string_agg(format('revoke all on table %I.%I from anon, authenticated;', n.nspname, c.relname)
+           || coalesce((select string_agg(format(' grant %s on table %I.%I to %I;', x.privs, n.nspname, c.relname, x.rolname), '' order by x.rolname)
+                        from (select r.rolname, string_agg(a.privilege_type, ', ' order by a.privilege_type) privs
+                              from aclexplode(c.relacl) a join pg_roles r on r.oid = a.grantee
+                              where r.rolname in ('anon', 'authenticated') group by r.rolname) x), ''), E'\n' order by c.relname) t
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace where c.relkind = 'r' and n.nspname in (select s from sch)),
 trg as (
   select string_agg(pg_get_triggerdef(t.oid) || ';', E'\n' order by c.relname, t.tgname) t
   from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
@@ -85,7 +92,8 @@ select concat_ws(E'\n\n',
   '-- who may call each function', (select t from fgrants),
   '-- triggers', (select t from trg),
   '-- row-level security', (select t from rls), (select t from pol),
-  '-- table rights the API never uses (stage9c)', 'revoke truncate, trigger, references on all tables in schema public from anon, authenticated;',
+  '-- table rights for the API roles, exactly as on live (includes the stage9c removal of TRUNCATE, TRIGGER, REFERENCES)', (select t from tgrants),
+  'alter default privileges in schema public revoke truncate, trigger, references on tables from anon, authenticated;',
   '-- realtime', 'do $p$ begin if not exists (select 1 from pg_publication where pubname = ''supabase_realtime'') then create publication supabase_realtime; end if; end $p$;', (select t from pub),
   '-- storage buckets (files themselves are not in database backups)', (select t from bkt),
   'reset check_function_bodies;') as snapshot;

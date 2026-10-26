@@ -1,0 +1,2809 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$comment": "Row shapes as the database returns them (generated from supabase/schema/schema_snapshot.sql, 26 Oct 2026). readOnly = set by the database; screens never send it. Fields not listed here do not exist.",
+ "version": "2026-10-26",
+ "$defs": {
+  "app_config": {
+   "type": "object",
+   "properties": {
+    "key": {
+     "type": "string"
+    },
+    "value": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "key",
+    "value"
+   ],
+   "additionalProperties": false
+  },
+  "candidates": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "role": {
+     "type": "string"
+    },
+    "sn": {
+     "type": "integer"
+    },
+    "name": {
+     "type": "string"
+    },
+    "phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "email": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "address": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "qualification": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "location": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "state": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "attempts": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "mode": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "availability": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "relocation": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "manual": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "adjust": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "portfolio": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "next_action": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "last_contact": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "last_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "history": {
+     "$comment": "has a default"
+    },
+    "self_reported": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "form_response_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "form_role": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "emailed_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "last_email_status": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "last_email_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "last_email_error": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "outreach": {
+     "$comment": "has a default"
+    },
+    "interview": {},
+    "added_manually": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "added_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "imported_from": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "company_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "id",
+    "role",
+    "sn",
+    "name"
+   ],
+   "additionalProperties": false
+  },
+  "companies": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "name": {
+     "type": "string"
+    },
+    "short_name": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "order": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "active": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "modules": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "short_name"
+   ],
+   "additionalProperties": false
+  },
+  "company_members": {
+   "type": "object",
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "role": {
+     "type": "string",
+     "enum": [
+      "admin",
+      "manager",
+      "staff",
+      "viewer"
+     ]
+    },
+    "added_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    },
+    "added_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   },
+   "required": [
+    "email",
+    "company_id",
+    "role"
+   ],
+   "additionalProperties": false
+  },
+  "company_settings": {
+   "type": "object",
+   "properties": {
+    "company_id": {
+     "type": "string"
+    },
+    "module": {
+     "type": "string"
+    },
+    "data": {
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "company_id",
+    "module"
+   ],
+   "additionalProperties": false
+  },
+  "conflicts": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "op_id": {
+     "type": "string",
+     "format": "uuid",
+     "readOnly": true
+    },
+    "entity": {
+     "type": "string"
+    },
+    "record_id": {
+     "type": "string"
+    },
+    "company_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "base_version": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "current_version": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "fields": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "incoming": {},
+    "current_values": {},
+    "actor": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "resolved_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "resolved_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "resolution": {}
+   },
+   "required": [
+    "op_id",
+    "entity",
+    "record_id",
+    "fields",
+    "incoming",
+    "current_values"
+   ],
+   "additionalProperties": false
+  },
+  "counters": {
+   "type": "object",
+   "properties": {
+    "company_id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "value": {
+     "type": "integer",
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "kind"
+   ],
+   "additionalProperties": false
+  },
+  "customer_request_files": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "request_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "file_path": {
+     "type": "string"
+    },
+    "size_bytes": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "mime": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "uploaded_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "request_id",
+    "company_id",
+    "name",
+    "file_path"
+   ],
+   "additionalProperties": false
+  },
+  "customer_request_messages": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "request_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "author": {
+     "type": "string"
+    },
+    "author_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "body": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "request_id",
+    "company_id",
+    "author",
+    "body"
+   ],
+   "additionalProperties": false
+  },
+  "customer_requests": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "user_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "ref": {
+     "type": "string"
+    },
+    "service": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "title": {
+     "type": "string"
+    },
+    "details": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "quantity": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "needed_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date"
+    },
+    "contact_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "contact_phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "contact_email": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "new",
+      "quoted",
+      "in_progress",
+      "done",
+      "declined"
+     ]
+    },
+    "staff_note": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "job_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "customer_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "client_ref": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    }
+   },
+   "required": [
+    "company_id",
+    "user_id",
+    "ref",
+    "title",
+    "status"
+   ],
+   "additionalProperties": false
+  },
+  "deletions": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "entity": {
+     "type": "string"
+    },
+    "record_id": {
+     "type": "string"
+    },
+    "label": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "company_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "children": {
+     "$comment": "has a default"
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "restored_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "restored_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "purged_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "purged_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    }
+   },
+   "required": [
+    "entity",
+    "record_id"
+   ],
+   "additionalProperties": false
+  },
+  "issues": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "candidate_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "role": {
+     "type": "string"
+    },
+    "issue": {
+     "type": "string"
+    },
+    "detail": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "action": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "resolved": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "resolution": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "resolved_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "resolved_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "company_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "role",
+    "issue"
+   ],
+   "additionalProperties": false
+  },
+  "leave_requests": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "staff_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "annual",
+      "sick",
+      "casual",
+      "maternity",
+      "paternity",
+      "unpaid",
+      "other"
+     ]
+    },
+    "start_date": {
+     "type": "string",
+     "format": "date"
+    },
+    "end_date": {
+     "type": "string",
+     "format": "date"
+    },
+    "days": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "reason": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "pending",
+      "approved",
+      "declined",
+      "cancelled"
+     ]
+    },
+    "requested_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "decided_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "decided_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "decision_note": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "staff_id",
+    "company_id",
+    "kind",
+    "start_date",
+    "end_date",
+    "status"
+   ],
+   "additionalProperties": false
+  },
+  "member_invites": {
+   "type": "object",
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "token": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "email",
+    "token"
+   ],
+   "additionalProperties": false
+  },
+  "members": {
+   "type": "object",
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "level": {
+     "type": "string",
+     "enum": [
+      "viewer",
+      "contributor",
+      "editor"
+     ]
+    },
+    "name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "added_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "invited",
+      "pending",
+      "active",
+      "disabled"
+     ]
+    },
+    "surname": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "first_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "other_names": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "position": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "photo_url": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "profile_done": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "requested_level": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "viewer",
+      "contributor",
+      "editor"
+     ]
+    },
+    "invited_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "invited_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "invite_sent_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "joined_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "last_seen_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "user_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "requested_company": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "requested_role": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "enum": [
+      "admin",
+      "manager",
+      "staff",
+      "viewer"
+     ]
+    }
+   },
+   "required": [
+    "email",
+    "level",
+    "status"
+   ],
+   "additionalProperties": false
+  },
+  "op_receipts": {
+   "type": "object",
+   "properties": {
+    "op_id": {
+     "type": "string",
+     "format": "uuid",
+     "readOnly": true
+    },
+    "actor": {
+     "type": "string"
+    },
+    "entity": {
+     "type": "string"
+    },
+    "record_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "action": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "result": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "version": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "finished_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    }
+   },
+   "required": [
+    "op_id",
+    "actor",
+    "entity"
+   ],
+   "additionalProperties": false
+  },
+  "ops_log": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "integer",
+     "readOnly": true
+    },
+    "op_id": {
+     "type": "string",
+     "format": "uuid",
+     "readOnly": true
+    },
+    "entity": {
+     "type": "string"
+    },
+    "record_id": {
+     "type": "string"
+    },
+    "company_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "action": {
+     "type": "string"
+    },
+    "result": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "base_version": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "result_version": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "actor": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "actor_uid": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "source": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "changes": {
+     "$comment": "has a default"
+    },
+    "error": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "conflict": {},
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "op_id",
+    "entity",
+    "record_id",
+    "action"
+   ],
+   "additionalProperties": false
+  },
+  "portal_profiles": {
+   "type": "object",
+   "properties": {
+    "user_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "business": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "email": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "user_id"
+   ],
+   "additionalProperties": false
+  },
+  "press_customers": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "email": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "address": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "created_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "name"
+   ],
+   "additionalProperties": false
+  },
+  "press_files": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "job_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "kind": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "title": {
+     "type": "string"
+    },
+    "file_path": {
+     "type": "string"
+    },
+    "size_bytes": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "mime": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "uploaded_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "uploaded_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "company_id",
+    "job_id",
+    "title",
+    "file_path"
+   ],
+   "additionalProperties": false
+  },
+  "press_jobs": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "number": {
+     "type": "string"
+    },
+    "customer_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "customer_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "title": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "description": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "items": {
+     "$comment": "has a default"
+    },
+    "subtotal": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "discount": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "total": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "deposit_pct": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "valid_days": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "stage": {
+     "type": "string",
+     "enum": [
+      "quote",
+      "accepted",
+      "design",
+      "proof",
+      "print",
+      "finishing",
+      "ready",
+      "delivered",
+      "cancelled"
+     ]
+    },
+    "quoted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "sent_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "accepted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "due_date": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date"
+    },
+    "delivered_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "assigned_to": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "specs": {
+     "$comment": "has a default"
+    },
+    "proof_approved_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "history": {
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "created_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "number",
+    "stage"
+   ],
+   "additionalProperties": false
+  },
+  "press_material_moves": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "material_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "job_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid"
+    },
+    "delta": {
+     "type": "number"
+    },
+    "note": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "moved_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "moved_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "material_id",
+    "delta"
+   ],
+   "additionalProperties": false
+  },
+  "press_materials": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "unit": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "quantity": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "reorder_level": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "unit_cost": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "name"
+   ],
+   "additionalProperties": false
+  },
+  "press_payments": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "job_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "receipt_no": {
+     "type": "string"
+    },
+    "amount": {
+     "type": "number"
+    },
+    "method": {
+     "type": "string",
+     "enum": [
+      "cash",
+      "transfer",
+      "pos",
+      "other"
+     ]
+    },
+    "paid_at": {
+     "type": "string",
+     "format": "date",
+     "$comment": "has a default"
+    },
+    "note": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "received_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "company_id",
+    "job_id",
+    "receipt_no",
+    "amount",
+    "method"
+   ],
+   "additionalProperties": false
+  },
+  "press_rate_items": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "category": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "name": {
+     "type": "string"
+    },
+    "unit": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "price": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "active": {
+     "type": "boolean",
+     "$comment": "has a default"
+    },
+    "order": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "name"
+   ],
+   "additionalProperties": false
+  },
+  "roles": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "name": {
+     "type": "string"
+    },
+    "qual_weight": {
+     "type": "number",
+     "$comment": "has a default"
+    },
+    "top": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "second": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "order": {
+     "type": "integer",
+     "$comment": "has a default"
+    },
+    "status": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "source": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "created_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "created_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "closed_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "closed_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "reopened_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "final_stats": {},
+    "company_id": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "id",
+    "name"
+   ],
+   "additionalProperties": false
+  },
+  "settings": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "data": {
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "additionalProperties": false
+  },
+  "staff": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "companies": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "$comment": "has a default"
+    },
+    "member_email": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "surname": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "first_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "other_names": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "full_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "email": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "position": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "department": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "employment_type": {
+     "type": "string",
+     "enum": [
+      "full_time",
+      "part_time",
+      "contract",
+      "intern",
+      "volunteer"
+     ]
+    },
+    "start_date": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date"
+    },
+    "end_date": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date"
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "active",
+      "left"
+     ]
+    },
+    "photo_url": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "candidate_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "history": {
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "created_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "company_id",
+    "employment_type",
+    "status"
+   ],
+   "additionalProperties": false
+  },
+  "staff_documents": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "staff_id": {
+     "type": "string",
+     "format": "uuid"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "title": {
+     "type": "string"
+    },
+    "file_path": {
+     "type": "string"
+    },
+    "size_bytes": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "mime": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "note": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "uploaded_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "uploaded_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    }
+   },
+   "required": [
+    "staff_id",
+    "company_id",
+    "title",
+    "file_path"
+   ],
+   "additionalProperties": false
+  },
+  "staff_private": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "company_id": {
+     "type": "string"
+    },
+    "address": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "date_of_birth": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date"
+    },
+    "emergency_name": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "emergency_phone": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "notes": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "version": {
+     "type": "integer",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "op_id": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "created_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_at": {
+     "type": "string",
+     "format": "date-time",
+     "readOnly": true,
+     "$comment": "has a default"
+    },
+    "updated_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "deleted_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time",
+     "readOnly": true
+    },
+    "deleted_by": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "readOnly": true
+    },
+    "delete_batch": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "uuid",
+     "readOnly": true
+    }
+   },
+   "required": [
+    "id",
+    "company_id"
+   ],
+   "additionalProperties": false
+  },
+  "sync_runs": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "format": "uuid",
+     "$comment": "made by the database if not given; the app may supply it as apply_op p_id (needed for offline inserts)"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "scheduled_for": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "started_at": {
+     "type": "string",
+     "format": "date-time",
+     "$comment": "has a default"
+    },
+    "finished_at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "status": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "tables": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "rows": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "files": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "bytes": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "file_name": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "drive_file_id": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "checksum": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "schema_version": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "format": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "error": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "source": {
+     "type": "string",
+     "$comment": "has a default"
+    },
+    "details": {
+     "$comment": "has a default"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "additionalProperties": false
+  }
+ }
+}

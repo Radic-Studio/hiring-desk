@@ -2,7 +2,8 @@
    Live:     the database answers normally and live updates are connected.
    Degraded: the database answers, but something is not right: server errors, very slow answers, live updates
              disconnected, or changes on this device still waiting to synchronize / refused.
-   Offline:  the browser is offline, or the database cannot be reached at all. Saves that may wait are kept on
+             Since Stage 9 this includes "the database cannot be reached" while the device itself is online.
+   Offline:  the device reports no connection (navigator.onLine is false). Saves that may wait are kept on
              this device (Stage 5); everything else says nothing was saved.
    How it knows: it watches the app's own requests to the database. It only checks on its own (one small read)
    when the app has been quiet for 2 minutes or looks offline, and only while someone is signed in with the

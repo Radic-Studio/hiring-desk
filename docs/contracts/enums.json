@@ -1,0 +1,68 @@
+{
+  "$comment": "Future Ready Group System: every fixed value list the screens may show or send. Source: live database (26 Oct 2026) and app/outbox.js, app/status.js. Changing any list here needs a database migration first.",
+  "version": "2026-10-26",
+  "database_enums": {
+    "member_level": { "values": ["viewer", "contributor", "editor"], "labels": { "viewer": "Member", "contributor": "Member (legacy contributor)", "editor": "Group Admin" } },
+    "member_status": { "values": ["invited", "pending", "active", "disabled"] },
+    "company_role": { "values": ["admin", "manager", "staff", "viewer"], "labels": { "admin": "Company Admin", "manager": "Manager", "staff": "Staff", "viewer": "Viewer" } },
+    "employment_type": { "values": ["full_time", "part_time", "contract", "intern", "volunteer"] },
+    "staff_status": { "values": ["active", "left"] },
+    "leave_kind": { "values": ["annual", "sick", "casual", "maternity", "paternity", "unpaid", "other"] },
+    "leave_status": { "values": ["pending", "approved", "declined", "cancelled"] },
+    "press_stage": { "values": ["quote", "accepted", "design", "proof", "print", "finishing", "ready", "delivered", "cancelled"] },
+    "pay_method": { "values": ["cash", "transfer", "pos", "other"] },
+    "request_status": { "values": ["new", "quoted", "in_progress", "done", "declined"] }
+  },
+  "check_constraint_lists": {
+    "candidate_status": { "values": ["pending", "awaiting", "attempted", "contacted"] },
+    "role_status": { "values": ["open", "closed"] },
+    "conflict_status": { "values": ["open", "kept_current", "took_incoming", "merged"] },
+    "request_message_author": { "values": ["customer", "staff"] },
+    "ops_log_action": { "values": ["insert", "update", "soft_delete", "restore", "delete", "conflict", "refused", "duplicate", "resolve"] },
+    "ops_log_result": { "values": ["applied", "conflict", "refused", "duplicate", "failed"] },
+    "ops_log_source": { "values": ["app", "rpc", "direct", "service", "function"], "meaning": { "app": "checked save path (apply_op)", "rpc": "named database function", "direct": "table write outside both (should not occur after Stage 9)", "service": "server process with no signed-in user (backups, triggers run by the system)", "function": "edge function (emails)" } },
+    "sync_run_kind": { "values": ["rolling", "nightly", "monthly", "sheet", "restore_test", "manual"] },
+    "sync_run_status": { "values": ["running", "success", "failed"] },
+    "company_settings_module": { "values": ["press", "portal"] },
+    "app_settings_id": { "values": ["scoring", "outreach", "interviewEmail"] }
+  },
+  "save_results": {
+    "$comment": "What one save returns. QUEUED is client-side only: the change is on this device and has not reached the database.",
+    "values": ["APPLIED", "DUPLICATE", "CONFLICT", "REFUSED", "FAILED", "QUEUED"],
+    "meaning": {
+      "APPLIED": "Saved in the database. Screen may say 'Saved'.",
+      "DUPLICATE": "The database already had this exact change (same operation id). Treat as saved; show the returned row.",
+      "CONFLICT": "Someone else changed the same field since this screen loaded. Non-clashing fields were saved; the clashing value waits in Conflicts for a Group Admin.",
+      "REFUSED": "Not allowed or not valid. Nothing saved. Show the message; do not retry automatically.",
+      "FAILED": "The database could not be reached or answered with an error. Nothing saved unless it was queued.",
+      "QUEUED": "Saved on this device. Waiting to synchronize. Never say 'Saved'."
+    }
+  },
+  "outbox_status": {
+    "values": ["waiting", "sending", "applied", "conflict", "refused", "failed"],
+    "meaning": {
+      "waiting": "On this device, not yet sent.",
+      "sending": "Being sent now (claimed by one tab).",
+      "applied": "Reached the database; removed from the outbox.",
+      "conflict": "Reached the database with a clash; kept until the person dismisses it.",
+      "refused": "The database said no; kept with the reason until dismissed.",
+      "failed": "Five non-network errors in a row; kept with 'Try again'."
+    },
+    "retry": ["on reconnect (browser online event)", "on app start", "every 30 seconds while anything is waiting", "manual 'Try again'"]
+  },
+  "connectivity_state": {
+    "values": ["LIVE", "DEGRADED", "OFFLINE"],
+    "meaning": {
+      "LIVE": "The database answers normally, live updates are connected and nothing on this device is waiting.",
+      "DEGRADED": "The device is online but something is wrong: the database cannot be reached, returned server errors in the last 2 minutes, or answers slowly (median over 4 s); the sign-in service is failing; live updates have been disconnected for over 20 s; or changes on this device are waiting or need attention. The panel shows the data-on-screen time, waiting count, last successful backup and what is unavailable.",
+      "OFFLINE": "The device itself reports no connection (navigator.onLine is false). Queue-safe changes are kept on the device; everything else says nothing was saved."
+    }
+  },
+  "never_queued_offline": {
+    "$comment": "Source: NEVER_OFFLINE and refuse() in app/outbox.js. These say 'nothing was saved' instead of queuing.",
+    "tables": ["press_payments", "press_material_moves", "staff", "staff_private", "staff_documents", "leave_requests"],
+    "changes": ["any change that sets stage or status to 'cancelled'", "any action other than insert/update/save (soft_delete, restore, purge)"],
+    "not_records": ["named functions: next_number (job, quote, receipt numbers), leave_decide, request_to_quote, member/company administration, settings, sign-in", "emails (send-email, send-doc)"],
+    "note": "A new job needs next_number from the database first, so new numbered jobs cannot be created offline."
+  }
+}

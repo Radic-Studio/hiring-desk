@@ -1,0 +1,52 @@
+{
+  "$comment": "Every database function the browser may call (POST /rest/v1/rpc/<name> with the signed-in user's token). Signatures read from the live database on 26 Oct 2026. Anything not listed here is not callable by the app. Errors come back as PostgREST errors: {code, message}; 42501 = not allowed, P0001 = refused with a readable message. Show the message as written.",
+  "version": "2026-10-26",
+  "mutation_strategy": {
+    "records": "apply_op (every row with id + version: roles, candidates, issues, staff, staff_private, staff_documents, leave_requests, press_customers, press_rate_items, press_jobs, press_payments, press_materials, press_files, customer_requests, press_material_moves (insert only), customer_request_messages (insert only))",
+    "workflow_and_settings": "the named functions below",
+    "files": "upload to Storage first, then save the record (apply_op, or portal_attach_file for customers)",
+    "never": "direct table insert/update/delete from the browser"
+  },
+  "functions": {
+    "apply_op": {
+      "args": { "p_op_id": "uuid, new per change, reused on retry", "p_entity": "table name from mutation_strategy.records", "p_id": "text|null (null on insert lets the database make the id)", "p_action": "insert | update | save", "p_patch": "object of fields; protected fields (id, version, op_id, deleted_*, created_*, updated_*) are ignored", "p_base_version": "int|null: the version the screen showed; null skips the clash check" },
+      "returns": { "result": "applied | duplicate | conflict | refused", "op_id": "uuid", "id": "text", "version": "int", "row": "the saved row", "message": "text to show (refused/conflict/duplicate)", "conflict_id": "uuid (conflict)", "fields": "text[] (conflict)", "first_result": "duplicate only: what happened the first time" },
+      "who": "see permissions.json tables",
+      "idempotent": true,
+      "queue_offline": "yes, except the never_queued_offline list in enums.json"
+    },
+    "soft_delete":        { "args": { "p_entity": "text", "p_id": "text" }, "returns": "deletions row (id = batch, children = counts per child table)", "who": "see permissions.json actions.soft_delete", "idempotent": "second call raises 'Already deleted'" },
+    "restore_deleted":    { "args": { "p_batch": "uuid" }, "returns": "deletions row", "who": "group_admin", "refuses": ["Already restored", "deleted permanently", "parent still deleted"] },
+    "purge_deleted":      { "args": { "p_batch": "uuid", "p_confirm": "text = the deletion's label" }, "returns": "deletions row", "who": "group_admin", "irreversible": true },
+    "resolve_conflict":   { "args": { "p_conflict": "uuid", "p_choice": "keep_current | take_incoming | merged", "p_values": "object (merge only)", "p_seen_version": "int", "p_op_id": "uuid" }, "returns": "jsonb {result, ...}", "who": "group_admin", "logged": true },
+    "save_company_settings": { "args": { "p_company": "text", "p_module": "press | portal", "p_data": "object (whole settings object)" }, "returns": "company_settings row", "who": "company_admin" },
+    "save_app_settings":  { "args": { "p_id": "scoring | outreach | interviewEmail", "p_data": "object" }, "returns": "settings row", "who": "group_admin" },
+    "next_number":        { "args": { "p_company": "text", "p_kind": "text (e.g. quote, job, receipt, request)" }, "returns": "int, never reused", "who": "staff and above", "queue_offline": false },
+    "leave_decide":       { "args": { "p_id": "uuid", "p_status": "approved | declined", "p_note": "text (max 500)" }, "returns": "jsonb {id, status}", "who": "manager; nobody decides their own request except a Group Admin", "note": "cancelling is the requester's own update through apply_op while pending" },
+    "leave_calendar":     { "args": { "p_company": "text" }, "returns": "rows {id, staff_id, staff_name, start_date, end_date, days, status} of approved leave not yet ended", "who": "any company role" },
+    "request_to_quote":   { "args": { "p_request": "uuid" }, "returns": "press_jobs row (new quote linked to the request)", "who": "staff and above" },
+    "portal_public":      { "args": { "p_company": "text" }, "returns": "jsonb public portal settings", "who": "anyone, including not signed in" },
+    "portal_submit_request": { "args": { "p_company": "text", "p_service": "text", "p_title": "text", "p_details": "text", "p_quantity": "text", "p_needed_by": "date|null", "p_name": "text", "p_phone": "text", "p_business": "text", "p_client_ref": "uuid (retry-safe)" }, "returns": "customer_requests row", "who": "signed-in customer", "idempotent": "by p_client_ref" },
+    "portal_attach_file": { "args": { "p_request": "uuid", "p_name": "text", "p_path": "<company>/<uid>/<request>/<file>", "p_size": "bigint", "p_mime": "text" }, "returns": "customer_request_files row", "who": "the customer who owns the request", "idempotent": "by path" },
+    "backup_last_success":{ "args": {}, "returns": "timestamptz|null", "who": "any member" },
+    "my_access":          { "args": {}, "returns": "jsonb {email, level, status, companies:[{id, role}] ...}", "who": "signed in" },
+    "my_member":          { "args": {}, "returns": "jsonb member row or null", "who": "signed in" },
+    "accept_invite":      { "args": {}, "returns": "jsonb member", "who": "signed in, invited" },
+    "request_access":     { "args": { "p_requested": "member_level", "p_name": "text", "p_company": "text", "p_role": "company_role" }, "returns": "jsonb", "who": "signed in, not yet a member" },
+    "update_my_profile":  { "args": { "p": "object {surname, first_name, other_names, phone, position, photo_url}" }, "returns": "jsonb", "who": "member (own profile)" },
+    "public_companies":   { "args": {}, "returns": "jsonb list of active companies", "who": "signed in" },
+    "admin_invite":       { "args": { "p_email": "text", "p_level": "viewer | editor", "p_name": "text", "p_company": "text|null", "p_role": "company_role|null" }, "returns": "jsonb", "who": "group_admin; company_admin for own company" },
+    "admin_approve":      { "args": { "p_email": "text", "p_company": "text|null", "p_role": "company_role", "p_group_admin": "boolean" }, "returns": "jsonb", "who": "group_admin; company_admin for own company" },
+    "admin_set_member":   { "args": { "p_email": "text", "p_level": "viewer | editor | null", "p_status": "member_status|null" }, "returns": "jsonb", "who": "group_admin", "guard": "last Group Admin" },
+    "admin_set_company_role": { "args": { "p_email": "text", "p_company": "text", "p_role": "company_role|null (null removes)" }, "returns": "jsonb", "who": "group_admin; company_admin for own company" },
+    "admin_remove_member":{ "args": { "p_email": "text" }, "returns": "boolean", "who": "group_admin", "guard": "last Group Admin" },
+    "admin_save_company": { "args": { "p_id": "text", "p_name": "text", "p_short": "text", "p_active": "boolean", "p_modules": "text[]" }, "returns": "jsonb", "who": "group_admin" },
+    "permission checks (read-only)": { "names": ["is_admin", "is_editor", "can_write", "can_write_company(cid)", "can_manage_company(cid)", "is_company_admin(cid)", "my_company_role(cid)", "my_level", "my_email", "admin_count"], "use": "to hide buttons; the database checks again on every write" }
+  },
+  "edge_functions": {
+    "send-email":   { "body": { "candidateId": "text", "kind": "outreach | interview", "subject": "text", "text": "text", "formUrl": "text?" }, "returns": { "status": "sent | failed", "recorded": "boolean" }, "who": "can_write_company of the candidate's company", "limit": "120 per sender per hour (HTTP 429)", "sends_to": "the candidate's stored email only", "logged": "candidate record via apply_op" },
+    "send-doc":     { "body": { "company": "text", "to": "email", "subject": "text", "text": "text", "html": "text?", "replyTo": "email?", "attachment": "{name, mime, base64}? max 6 MB", "kind": "text?", "ref": "text?" }, "returns": { "status": "sent | failed", "to": "email", "error": "text?" }, "who": "staff and above", "limit": "60 per sender per hour (HTTP 429 rate_limited)", "logged": "ops_log entity 'email'" },
+    "invite-member":{ "who": "group_admin or company_admin", "note": "sends the invitation email" },
+    "auth-email":   { "who": "Supabase Auth hook only (not called by the app)" }
+  }
+}
