@@ -846,6 +846,9 @@ ul.plain{margin:0;padding-left:18px}
 p.flag{margin:0 0 8px}
 @media (max-width:1100px){.editor{grid-template-columns:minmax(0,1fr)}.ed-side .sticky{position:static}}
 
+.wa-btn{color:#13733A;border-color:#B7DCC4;text-decoration:none}
+.wa-btn::before{content:"";width:8px;height:8px;border-radius:50%;background:#25A35A}
+.wa-btn:hover{background:#EAF6EE}
 /* ---- responsive (spec §12.1) ---- */
 .bottom-nav{display:none}
 @media (max-width:1279px){ main{padding:20px 20px 32px} .head{padding:14px 20px 0} }

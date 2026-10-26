@@ -21,6 +21,7 @@ S.settings = S.settings || DEFAULT_SETTINGS;
 // Fallback role definitions for the two original roles, used until roles/* documents load.
 const LEGACY_ROLES = { bd: { name: "Business Developer", qualWeight: 1, top: 10, second: 20 }, gd: { name: "Graphic Designer", qualWeight: 0.5, top: 10, second: 25 } };
 const waNumber = p => { const d = String(p || "").replace(/\D/g, ""); return d.startsWith("0") ? "234" + d.slice(1) : d; };
+const waHref = c => { const first = (c.name || "").split(" ")[0], rl = roleOf(c.role); return c.phone ? `https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Good day ${first}, this is Future Ready Nigeria Ltd regarding your Jobberman application for the ${rl.name} role. Please take two minutes to answer a few questions so we can move your application forward: ${FORM_URL}\n\nIf you prefer, reply here with how soon you could resume and where you currently live. Our office is at Udeorji Street, Obiagu, Enugu.`)}` : ""; };
 const ro = () => S.canWrite === false;
 const roleOf = id => S.roles[id] || S.all.roles[id] || LEGACY_ROLES[id] || { name: id, qualWeight: 1, top: 10, second: 20 };
 const roleName = id => roleOf(id).name;
@@ -135,7 +136,7 @@ function renderCandidates(comp) {
     $("#add-cand").addEventListener("click", () => openAddDrawer(S.role));
     $("#dl-list").addEventListener("click", () => openDownload(filterLabel(S.filters) ? { kind: "filtered" } : { kind: "role", role: S.role }));
     $("#chips").addEventListener("click", e => { const m = e.target.closest("[data-rolemenu]"); if (m) { openRoleMenu(m.dataset.rolemenu); return; } const c = e.target.closest("[data-role]"); if (c) { S.role = c.dataset.role; S.sel.clear(); renderCandidates(compute()); } const a = e.target.closest("[data-go]"); if (a) setView("import"); });
-    el.addEventListener("click", e => { const r = e.target.closest("[data-id]"); if (r) openDrawer(r.dataset.id); });
+    el.addEventListener("click", e => { if (e.target.closest("[data-wa]")) return; const r = e.target.closest("[data-id]"); if (r) openDrawer(r.dataset.id); });
   }
   $("#q").value = f.q; $("#fs").value = f.status; $("#fa").value = f.avail; $("#fl").value = f.loc; $("#ft").value = f.tier;
   $("#add-cand").hidden = true; FR.paintPrimary?.();
@@ -162,13 +163,13 @@ function renderCandidates(comp) {
     <td>${pillLoc(c.location)}<span class="sub">${esc(c.state || "")}</span></td>
     <td>${esc(c.qualification)}</td><td>${pillStatus(c)}</td><td>${pillAvail(c.availability)}</td>
     <td><span class="num">${o.pre}</span><div class="bar"><i style="width:${Math.round(o.pre / maxPre * 100)}%"></i></div></td>
-    <td>${pillTier(o.tier)}</td><td><button class="btn small" data-id="${c.id}">${ro() ? "View" : "Log"}</button></td></tr>`; }).join("") || `<tr><td colspan="10" class="muted">Nothing matches these filters.</td></tr>`;
+    <td>${pillTier(o.tier)}</td><td><span class="row-acts">${c.phone && !ro() ? `<a class="btn small wa-btn" href="${waHref(c)}" target="_blank" rel="noopener" data-wa="${c.id}" aria-label="WhatsApp ${esc(c.name)}">WhatsApp</a>` : ""}<button class="btn small" data-id="${c.id}">${ro() ? "View" : "Log"}</button></span></td></tr>`; }).join("") || `<tr><td colspan="10" class="muted">Nothing matches these filters.</td></tr>`;
   $("#sel-all").checked = rows.length > 0 && rows.every(c => S.sel.has(c.id)); $("#sel-all").disabled = ro();
   renderSelbar();
   $("#cd").innerHTML = rows.map(c => { const o = comp[c.id]; return `<div class="ccard ${c.status || ""}" data-id="${c.id}">
     <div class="row"><b><label onclick="event.stopPropagation()" style="display:inline-flex;gap:8px;align-items:center"><input type="checkbox" data-sel="${c.id}" ${S.sel.has(c.id) ? "checked" : ""} ${ro() ? "disabled" : ""} style="width:16px;height:16px;accent-color:var(--accent)"></label><span class="rank ${o.rank <= top ? "top" : ""}">${o.rank}</span> &nbsp;<button type="button" class="rowlink" data-id="${c.id}">${esc(c.name)}</button></b>${pillStatus(c)}${c.emailedAt ? ` <span class="pill accent flat">Emailed</span>` : ""}</div>
     <div class="row">${pillLoc(c.location)}<span class="muted">${esc(c.qualification)}</span><span class="num">${o.pre} pts</span></div>
-    <div class="row"><span class="num muted">${esc(c.phone || "no phone")}</span>${pillTier(o.tier)}</div></div>`; }).join("");
+    <div class="row"><span class="num muted">${esc(c.phone || "no phone")}</span>${pillTier(o.tier)}</div>${c.phone && !ro() ? `<div class="row"><a class="btn small wa-btn" href="${waHref(c)}" target="_blank" rel="noopener" data-wa="${c.id}">WhatsApp</a><a class="btn small" href="tel:${esc(String(c.phone).replace(/[^\d+]/g, ""))}" data-wa="${c.id}">Call</a></div>` : ""}</div>`; }).join("");
 }
 
 /* ---- second interview ---- */
@@ -255,6 +256,7 @@ function renderDashboard(comp) {
     </div>
     <div class="card"><details class="settings"><summary>Scoring rules</summary><div id="settings-body"></div></details></div>`;
     el.addEventListener("click", e => {
+      if (e.target.closest("[data-wa]")) return;
       const r = e.target.closest("[data-id]"); if (r) { openDrawer(r.dataset.id); return; }
       const t = e.target.closest("[data-tile]"); if (t) { const k = t.dataset.tile;
         if (k === "contacted") setView("candidates", { filters: { status: "contacted" } });
@@ -272,7 +274,7 @@ function renderDashboard(comp) {
   const dn = $("#demo-note"); dn.hidden = !demoRoles.length;
   if (demoRoles.length) dn.textContent = `These figures include ${demoRoles.map(r => { const k = byRole(r).length; return `${k} test candidate${k === 1 ? "" : "s"} in "${roleName(r)}"`; }).join(" and ")}. They are DEMO records, not real applicants.`;
   $("#role-tiles").innerHTML = ids.map(r => { const rs = byRole(r), done = rs.filter(c => c.status === "contacted").length; return `<button class="chip" data-role="${esc(r)}">${esc(roleName(r))}<span class="cnt">${done}/${rs.length} contacted</span></button>`; }).join("") || `<span class="muted">No roles yet.</span>`;
-  $("#nextup").innerHTML = nextUp.map(c => `<li><span class="rank ${comp[c.id].rank <= (roleOf(c.role).top ?? 10) ? "top" : ""}" aria-label="Rank ${comp[c.id].rank}">${comp[c.id].rank}</span><button type="button" class="att-main" data-id="${c.id}"><b>${esc(c.name)}</b><span>${esc(roleName(c.role))} · ${esc(c.location || "Unknown")}${c.phone ? " · " + esc(c.phone) : ""}</span></button><span class="att-tag">${pillStatus(c)}</span></li>`).join("") || `<li class="empty-inline">${S.loaded ? "Everyone has been contacted." : "Loading…"}</li>`;
+  $("#nextup").innerHTML = nextUp.map(c => `<li><span class="rank ${comp[c.id].rank <= (roleOf(c.role).top ?? 10) ? "top" : ""}" aria-label="Rank ${comp[c.id].rank}">${comp[c.id].rank}</span><button type="button" class="att-main" data-id="${c.id}"><b>${esc(c.name)}</b><span>${esc(roleName(c.role))} · ${esc(c.location || "Unknown")}${c.phone ? " · " + esc(c.phone) : ""}</span></button><span class="att-tag">${c.phone && !ro() ? `<a class="btn small wa-btn" href="${waHref(c)}" target="_blank" rel="noopener" data-wa="${c.id}" aria-label="WhatsApp ${esc(c.name)}">WhatsApp</a>` : pillStatus(c)}</span></li>`).join("") || `<li class="empty-inline">${S.loaded ? "Everyone has been contacted." : "Loading…"}</li>`;
   $("#due-n").textContent = due.length ? `${due.length} today or overdue` : "";
   $("#due").innerHTML = due.slice(0, 8).map(c => `<li><span class="lv ${c.nextAction < today ? "bad" : "warn"}" aria-hidden="true"></span><button type="button" class="att-main" data-id="${c.id}"><b>${esc(c.name)}</b><span>${c.nextAction < today ? "was due " : "due "}${esc(FR.fmtDate ? new Date(c.nextAction + "T12:00:00").toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : c.nextAction)}${c.notes ? " · " + esc(c.notes.slice(0, 60)) : ""}</span></button><span class="att-tag">${pillStatus(c)}</span></li>`).join("") || `<li class="empty-inline">Nothing due. Set a next-action date on a candidate you need to call back.</li>`;
   const css = getComputedStyle(document.documentElement), A = css.getPropertyValue("--accent").trim(), I = css.getPropertyValue("--info").trim(), OK = css.getPropertyValue("--ok").trim(), W = css.getPropertyValue("--warn").trim(), B = css.getPropertyValue("--bad").trim(), M = css.getPropertyValue("--line-2").trim();
@@ -762,7 +764,7 @@ function openDrawer(id) {
   const sel = (idn, opts, val, blank = "—") => `<select id="${idn}" ${locked ? "disabled" : ""}>${blank !== null ? `<option value="">${blank}</option>` : ""}${opts.map(x => `<option ${x === val ? "selected" : ""}>${x}</option>`).join("")}</select>`;
   const hist = (c.history || []).slice().reverse(); const names = [...new Set(hist.map(h => h.by).filter(Boolean))];
   const first = c.name.split(" ")[0];
-  const wa = c.phone ? `https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Good day ${first}, this is Future Ready Nigeria Ltd regarding your Jobberman application for the ${rl.name} role. Please take two minutes to answer a few questions so we can move your application forward: ${FORM_URL}\n\nIf you prefer, reply here with how soon you could resume and where you currently live. Our office is at Udeorji Street, Obiagu, Enugu.`)}` : "";
+  const wa = waHref(c);
   $("#drawer").innerHTML = `<header><div><h2>${esc(c.name)}</h2><div class="muted" style="margin-top:4px">${esc(rl.name)} · #${c.sn} in register · ${pillTier(o.tier)} ${flagged(id) ? `<span class="pill bad flat">has open issue</span>` : ""}</div></div><button class="x" id="close" aria-label="Close">×</button></header>
   <div class="body">
     ${locked ? `<div class="banner warn">You have view-only access. Ask the owner for Contributor or Editor access to log calls.</div>` : ""}
