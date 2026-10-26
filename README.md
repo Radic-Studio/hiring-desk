@@ -71,10 +71,10 @@ Recorded locations (fill in after setup; IDs are not secrets, keys are never wri
 
 | Item | Value |
 | --- | --- |
-| Backup account owner | _to fill_ |
-| Recovery email / phone on that account | _to fill_ |
-| Drive folder ID | _to fill_ (also in `app_config.backup_drive_folder_id`) |
-| Spreadsheet ID | _to fill_ (also in `app_config.backup_sheet_id`) |
+| Backup account owner | radiantb3@gmail.com (script project "Future Ready Backups", set up 2026-10-26) |
+| Recovery email / phone on that account | collinsonuora05@gmail.com (owner to confirm 2-Step Verification is on) |
+| Drive folder ID | `1YeNyM7ZF-RHFmTgxB7zEv-YJlxk3vhPJ` (also in `app_config.backup_drive_folder_id`) |
+| Spreadsheet ID | `1No3W-7ucMWB76HpWdbZhcwuGrDPplsfL5tk51q2tNrs` (also in `app_config.backup_sheet_id`) |
 
 Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`node apps-script/tests/backup.test.js`, needs a `fixture_export.json` produced by `select public.backup_export()`, which is not committed because it holds personal data).
 
