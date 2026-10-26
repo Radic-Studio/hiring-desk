@@ -88,6 +88,10 @@ Group Admins see **Group → Recently deleted**: what was deleted, by whom, when
 
 The Hiring Sheet script (`apps-script/Code.gs`) leaves deleted roles, candidates and issues out of the Sheet and out of form matching; re-paste it into the Hiring Sheet's Apps Script to pick this up. Backups include deleted rows with their `deleted_at`, so a restore from backup keeps them deleted. Rollback notes are at the top of `supabase/migrations/20261026_soft_deletes.sql`; `supabase/rollback/stage2_policies_before.sql` holds the earlier policies.
 
+## Versions and the operations log
+
+Every write to the 13 business tables is stamped by the database (`stamp_row` trigger): `version` is 1 on insert and goes up by one on every update, whatever the client sends; each write gets a fresh `op_id` (or the one a server function sets in `fr.op_id`, used from Stage 4); `updated_at` / `updated_by` are set (the signed-in person's confirmed email, or `service` for scripts and server functions). A second trigger (`log_op`) writes one row per write to `public.ops_log`: op_id, entity, record, company, action (insert, update, soft_delete, restore, delete), result, base and resulting version, actor, source, the changed fields and the time. Staff phone, email, address, birth date, emergency contacts, notes and photo, leave reasons and document paths are logged as `[set]` / `[changed]`, never their values; `history` columns and values over 2,000 characters are left out. Only Group Admins can read the log; nobody can edit or delete it through the API. The log is included in the backups.
+
 ## Adding a module
 
 Create `app/modules/<id>.js`, call `FR.registerModule({ id, name, views: [{ id, title, sub, icon, count? }], start(), onCompany(), render() })`, add the script tag to `index.html` before `app/shell.js`, and list the module id in `companies.modules` for the companies that use it.
