@@ -138,9 +138,9 @@ function renderCandidates(comp) {
     el.addEventListener("click", e => { const r = e.target.closest("[data-id]"); if (r) openDrawer(r.dataset.id); });
   }
   $("#q").value = f.q; $("#fs").value = f.status; $("#fa").value = f.avail; $("#fl").value = f.loc; $("#ft").value = f.tier;
-  $("#add-cand").hidden = ro() || !S.role || !S.loaded;
+  $("#add-cand").hidden = true; FR.paintPrimary?.();
   $("#dl-list").hidden = !DL || !S.role || !S.loaded;
-  $("#chips").innerHTML = (viewingClosed ? `<span class="pill warn flat">Viewing ended role: ${esc(roleName(S.role))}</span>` : "") + ids.map(r => `<button class="chip" data-role="${esc(r)}" aria-pressed="${r === S.role}">${esc(roleName(r))}<span class="cnt">${byRole(r).length}</span></button>`).join("") + (ro() ? "" : `<button class="chip add" data-go="import">+ Import a role</button>`) + (ro() || !S.role ? "" : `<button class="chip" data-rolemenu="${esc(S.role)}" title="Role settings" style="margin-left:auto">⋯ ${esc(roleName(S.role))}</button>`);
+  $("#chips").innerHTML = (viewingClosed ? `<span class="pill warn flat">Viewing ended role: ${esc(roleName(S.role))}</span>` : "") + ids.map(r => `<button class="chip" data-role="${esc(r)}" aria-pressed="${r === S.role}">${esc(roleName(r))}<span class="cnt">${byRole(r).length}</span></button>`).join("") + (ro() ? "" : `<button class="chip add" data-go="import">+ Import a role</button>`) + (ro() || !S.role ? "" : `<button class="chip" data-rolemenu="${esc(S.role)}" style="margin-left:auto">Role settings</button>`);
   const all = S.role ? byRole(S.role) : [];
   const rows = all.filter(c => {
     const o = comp[c.id];
@@ -158,7 +158,7 @@ function renderCandidates(comp) {
   $("#tb").innerHTML = rows.map(c => { const o = comp[c.id]; return `<tr data-id="${c.id}" class="${effStatus(c)}">
     <td class="sel" onclick="event.stopPropagation()"><input type="checkbox" data-sel="${c.id}" ${S.sel.has(c.id) ? "checked" : ""} ${ro() ? "disabled" : ""} aria-label="Select ${esc(c.name)}"></td>
     <td><span class="rank ${o.rank <= top ? "top" : ""}">${o.rank}</span></td>
-    <td class="name">${esc(c.name)}${flagged(c.id) ? ` <span class="pill bad flat" title="See Issues">!</span>` : ""}${c.emailedAt ? ` <span class="pill ${c.lastEmailStatus === "sent" ? "accent" : c.lastEmailStatus === "unknown" ? "warn" : "bad"} flat" title="${esc(c.lastEmailStatus === "sent" ? "Outreach email sent " + fmtDate(c.emailedAt) : c.lastEmailStatus === "unknown" ? "Send outcome unknown; check your Sent folder" : "Last send failed")}">${c.lastEmailStatus === "sent" ? "Emailed" : c.lastEmailStatus === "unknown" ? "Email?" : "Email failed"}</span>` : ""}<span class="sub">${esc(c.address || "No address in register")}</span></td>
+    <td class="name"><button type="button" class="rowlink" data-id="${c.id}">${esc(c.name)}</button>${flagged(c.id) ? ` <span class="pill bad flat" title="See Issues">!</span>` : ""}${c.emailedAt ? ` <span class="pill ${c.lastEmailStatus === "sent" ? "accent" : c.lastEmailStatus === "unknown" ? "warn" : "bad"} flat" title="${esc(c.lastEmailStatus === "sent" ? "Outreach email sent " + fmtDate(c.emailedAt) : c.lastEmailStatus === "unknown" ? "Send outcome unknown; check your Sent folder" : "Last send failed")}">${c.lastEmailStatus === "sent" ? "Emailed" : c.lastEmailStatus === "unknown" ? "Email?" : "Email failed"}</span>` : ""}<span class="sub">${esc(c.address || "No address in register")}</span></td>
     <td>${pillLoc(c.location)}<span class="sub">${esc(c.state || "")}</span></td>
     <td>${esc(c.qualification)}</td><td>${pillStatus(c)}</td><td>${pillAvail(c.availability)}</td>
     <td><span class="num">${o.pre}</span><div class="bar"><i style="width:${Math.round(o.pre / maxPre * 100)}%"></i></div></td>
@@ -166,7 +166,7 @@ function renderCandidates(comp) {
   $("#sel-all").checked = rows.length > 0 && rows.every(c => S.sel.has(c.id)); $("#sel-all").disabled = ro();
   renderSelbar();
   $("#cd").innerHTML = rows.map(c => { const o = comp[c.id]; return `<div class="ccard ${c.status || ""}" data-id="${c.id}">
-    <div class="row"><b><label onclick="event.stopPropagation()" style="display:inline-flex;gap:8px;align-items:center"><input type="checkbox" data-sel="${c.id}" ${S.sel.has(c.id) ? "checked" : ""} ${ro() ? "disabled" : ""} style="width:16px;height:16px;accent-color:var(--accent)"></label><span class="rank ${o.rank <= top ? "top" : ""}">${o.rank}</span> &nbsp;${esc(c.name)}</b>${pillStatus(c)}${c.emailedAt ? ` <span class="pill accent flat">Emailed</span>` : ""}</div>
+    <div class="row"><b><label onclick="event.stopPropagation()" style="display:inline-flex;gap:8px;align-items:center"><input type="checkbox" data-sel="${c.id}" ${S.sel.has(c.id) ? "checked" : ""} ${ro() ? "disabled" : ""} style="width:16px;height:16px;accent-color:var(--accent)"></label><span class="rank ${o.rank <= top ? "top" : ""}">${o.rank}</span> &nbsp;<button type="button" class="rowlink" data-id="${c.id}">${esc(c.name)}</button></b>${pillStatus(c)}${c.emailedAt ? ` <span class="pill accent flat">Emailed</span>` : ""}</div>
     <div class="row">${pillLoc(c.location)}<span class="muted">${esc(c.qualification)}</span><span class="num">${o.pre} pts</span></div>
     <div class="row"><span class="num muted">${esc(c.phone || "no phone")}</span>${pillTier(o.tier)}</div></div>`; }).join("");
 }
@@ -179,14 +179,14 @@ function renderInterview(comp) {
   if (!list.length) { el.innerHTML = `<div class="empty"><h2>No one has qualified yet</h2><p>A candidate appears here once a call is logged where they are available and either live in Enugu or will relocate. An editor can also force someone onto the list from their record (Shortlist override → Yes).</p></div>`; return; }
   const hired = list.filter(c => c.interview?.outcome === "Hired").length, invited = list.filter(c => c.interview?.invitedAt).length;
   el.innerHTML = `<div class="toolbar"><span class="muted">${list.length} candidate${list.length === 1 ? "" : "s"}, best first · ${invited} invited · ${hired} hired</span><span style="margin-left:auto;display:inline-flex;gap:8px">${ro() ? "" : `<button class="btn small primary" id="si-invite">Invite to interview</button>`}${DL ? `<button class="btn small" id="dl-si">Download shortlist</button>` : ""}</span></div>
-  <div class="hint">"Invite to interview" emails everyone on this list who has not been invited yet, using the interview template (you can edit it before sending). Tap a row to record the interview date and outcome.</div>
+  <div class="hint">"Invite to interview" emails everyone on this list who has not been invited yet, using the interview template (you can edit it before sending). Open a name to record the interview date and outcome.</div>
   <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Candidate</th><th>Role</th><th>Phone</th><th>Location</th><th>Availability</th><th>Final</th><th>Interview</th><th>Why</th></tr></thead><tbody>
   ${list.map(c => { const o = comp[c.id]; return `<tr data-id="${c.id}"><td><span class="rank ${o.combined <= 3 ? "top" : ""}">${o.combined}</span></td>
-    <td class="name">${esc(c.name)}<span class="sub">${esc(c.email)}</span></td><td>${pillRole(c.role)}</td>
+    <td class="name"><button type="button" class="rowlink" data-id="${c.id}">${esc(c.name)}</button><span class="sub">${esc(c.email)}</span></td><td>${pillRole(c.role)}</td>
     <td class="num">${esc(c.phone)}</td><td>${pillLoc(c.location)}</td><td>${pillAvail(c.availability)}</td><td class="num"><b>${o.final}</b></td>
     <td>${pillInterview(c)}</td>
     <td><div class="crit">${o.criteria.map(x => `<span class="pill flat">${esc(x)}</span>`).join("")}</div></td></tr>`; }).join("")}</tbody></table></div>
-  <div class="cards">${list.map(c => { const o = comp[c.id]; return `<div class="ccard" data-id="${c.id}"><div class="row"><b><span class="rank ${o.combined <= 3 ? "top" : ""}">${o.combined}</span> &nbsp;${esc(c.name)}</b><span class="num">${o.final}</span></div>
+  <div class="cards">${list.map(c => { const o = comp[c.id]; return `<div class="ccard" data-id="${c.id}"><div class="row"><b><span class="rank ${o.combined <= 3 ? "top" : ""}">${o.combined}</span> &nbsp;<button type="button" class="rowlink" data-id="${c.id}">${esc(c.name)}</button></b><span class="num">${o.final}</span></div>
     <div class="row">${pillRole(c.role)}${pillAvail(c.availability)}</div><div class="crit">${o.criteria.map(x => `<span class="pill flat">${esc(x)}</span>`).join("")}</div></div>`; }).join("")}</div>`;
   el.onclick = e => { if (e.target.closest("#dl-si")) { openDownload({ kind: "interview" }); return; } if (e.target.closest("#si-invite")) { const ids = list.filter(c => !c.interview?.invitedAt && c.email).map(c => c.id); if (!ids.length) { toast("Everyone on the list has been invited already (or has no email)", "warn"); return; } openEmail(ids, "interview"); return; } const r = e.target.closest("[data-id]"); if (r) openDrawer(r.dataset.id); };
 }
@@ -199,13 +199,13 @@ function renderIssues() {
   const open = list.filter(i => !i.resolved).length;
   el.innerHTML = `<div class="banner"><b>${open} open</b><span class="muted">${ro() ? "Only editors can resolve these." : "Fix each one before trusting that candidate's phone, email or location. Type what you did, then tick the box."}</span></div>
   <div class="card">${list.map(i => `<div class="issue ${i.resolved ? "resolved" : ""}" data-iid="${i.id}">
-    <input type="checkbox" ${i.resolved ? "checked" : ""} ${ro() ? "disabled" : ""} aria-label="Resolved" data-act="resolve">
-    <div class="what"><div><b data-id="${esc(i.candidateId)}">${esc(i.name)}</b> <span class="muted">· ${esc(i.role)}</span> <span class="pill ${/phone/i.test(i.issue) ? "bad" : /address|qualification/i.test(i.issue) ? "warn" : "info"} flat">${esc(i.issue)}</span></div>
+    <input type="checkbox" ${i.resolved ? "checked" : ""} ${ro() ? "disabled" : ""} aria-label="Resolved: ${esc(i.name)}, ${esc(i.issue)}" data-act="resolve">
+    <div class="what"><div><button type="button" class="rowlink" data-id="${esc(i.candidateId)}">${esc(i.name)}</button> <span class="muted">· ${esc(i.role)}</span> <span class="pill ${/phone/i.test(i.issue) ? "bad" : /address|qualification/i.test(i.issue) ? "warn" : "info"} flat">${esc(i.issue)}</span></div>
       <div>${esc(i.detail)}</div><div class="muted">Action: ${esc(i.action)}</div>
-      ${i.resolved ? `<div class="muted">Resolved${i.resolution ? ": " + esc(i.resolution) : ""}${i.resolvedAt ? " · " + fmtDate(i.resolvedAt) : ""}</div>` : ro() ? "" : `<input type="text" placeholder="What did you do? (saved when you tick the box)" value="${esc(i.resolution || "")}" data-act="note">`}
+      ${i.resolved ? `<div class="muted">Resolved${i.resolution ? ": " + esc(i.resolution) : ""}${i.resolvedAt ? " · " + fmtDate(i.resolvedAt) : ""}</div>` : ro() ? "" : `<input type="text" placeholder="What did you do? (saved when you tick the box)" aria-label="What was done for ${esc(i.name)}" value="${esc(i.resolution || "")}" data-act="note">`}
     </div></div>`).join("") || `<div class="muted">No issues recorded.</div>`}</div>`;
   el.onclick = async e => {
-    const b = e.target.closest("b[data-id]"); if (b) { openDrawer(b.dataset.id); return; }
+    const b = e.target.closest("button[data-id]"); if (b) { openDrawer(b.dataset.id); return; }
     const cb = e.target.closest("input[data-act=resolve]"); if (!cb) return;
     const row = cb.closest("[data-iid]"), i = S.issues[row.dataset.iid]; const note = row.querySelector("input[data-act=note]");
     const body = { ...i, resolved: cb.checked, resolution: note ? note.value.trim() : i.resolution || "", resolvedAt: cb.checked ? new Date().toISOString() : null, resolvedBy: cb.checked ? S.me?.id || null : null };
@@ -240,11 +240,12 @@ function renderDashboard(comp) {
   const nextUp = all.filter(c => (c.status || "pending") !== "contacted").sort((a, b) => (a.role === b.role ? comp[a.id].rank - comp[b.id].rank : ids.indexOf(a.role) - ids.indexOf(b.role))).slice(0, 8);
   if (!el.dataset.built) {
     el.dataset.built = "1";
-    el.innerHTML = `<div class="banner info" id="demo-note" hidden></div><div class="tiles" id="tiles"></div>
-    <div class="grid2">
-      <div class="card"><h2>Next up <small>pre-call order</small></h2><ul class="nextup" id="nextup"></ul></div>
-      <div class="card"><h2>Follow-ups due <small id="due-n"></small></h2><ul class="nextup" id="due"></ul></div>
+    el.innerHTML = `<div class="banner info" id="demo-note" hidden></div>
+    <div class="grid-2">
+      <section class="panel" aria-labelledby="nu-h"><div class="panel-head"><h2 id="nu-h">Call next</h2><span class="muted">best-ranked people not yet reached</span></div><ul class="att-list" id="nextup"></ul></section>
+      <section class="panel" aria-labelledby="due-h"><div class="panel-head"><h2 id="due-h">Follow-ups due</h2><span class="muted" id="due-n"></span></div><ul class="att-list" id="due"></ul></section>
     </div>
+    <div class="tiles" id="tiles"></div>
     <div class="card"><h2>Roles <small>tap one to open its candidates</small></h2><div class="chips" id="role-tiles"></div></div>
     <div class="grid2">
       <div class="card"><h2>Contact progress</h2><div class="chart-box"><canvas id="ch-progress"></canvas></div></div>
@@ -271,9 +272,9 @@ function renderDashboard(comp) {
   const dn = $("#demo-note"); dn.hidden = !demoRoles.length;
   if (demoRoles.length) dn.textContent = `These figures include ${demoRoles.map(r => { const k = byRole(r).length; return `${k} test candidate${k === 1 ? "" : "s"} in "${roleName(r)}"`; }).join(" and ")}. They are DEMO records, not real applicants.`;
   $("#role-tiles").innerHTML = ids.map(r => { const rs = byRole(r), done = rs.filter(c => c.status === "contacted").length; return `<button class="chip" data-role="${esc(r)}">${esc(roleName(r))}<span class="cnt">${done}/${rs.length} contacted</span></button>`; }).join("") || `<span class="muted">No roles yet.</span>`;
-  $("#nextup").innerHTML = nextUp.map(c => `<li data-id="${c.id}"><span class="rank">${comp[c.id].rank}</span><span><b>${esc(c.name)}</b><span class="sub muted"> · ${esc(roleName(c.role))} · ${esc(c.location || "Unknown")}</span></span>${pillStatus(c)}</li>`).join("") || `<li class="muted">${S.loaded ? "Everyone has been contacted." : "Loading…"}</li>`;
+  $("#nextup").innerHTML = nextUp.map(c => `<li><span class="rank ${comp[c.id].rank <= (roleOf(c.role).top ?? 10) ? "top" : ""}" aria-label="Rank ${comp[c.id].rank}">${comp[c.id].rank}</span><button type="button" class="att-main" data-id="${c.id}"><b>${esc(c.name)}</b><span>${esc(roleName(c.role))} · ${esc(c.location || "Unknown")}${c.phone ? " · " + esc(c.phone) : ""}</span></button><span class="att-tag">${pillStatus(c)}</span></li>`).join("") || `<li class="empty-inline">${S.loaded ? "Everyone has been contacted." : "Loading…"}</li>`;
   $("#due-n").textContent = due.length ? `${due.length} today or overdue` : "";
-  $("#due").innerHTML = due.slice(0, 8).map(c => `<li data-id="${c.id}"><span class="num muted">${c.nextAction.slice(5)}</span><span><b>${esc(c.name)}</b><span class="sub muted"> · ${esc(c.notes || "").slice(0, 60)}</span></span>${pillStatus(c)}</li>`).join("") || `<li class="muted">Nothing due. Set a next-action date on a candidate you need to call back.</li>`;
+  $("#due").innerHTML = due.slice(0, 8).map(c => `<li><span class="lv ${c.nextAction < today ? "bad" : "warn"}" aria-hidden="true"></span><button type="button" class="att-main" data-id="${c.id}"><b>${esc(c.name)}</b><span>${c.nextAction < today ? "was due " : "due "}${esc(FR.fmtDate ? new Date(c.nextAction + "T12:00:00").toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : c.nextAction)}${c.notes ? " · " + esc(c.notes.slice(0, 60)) : ""}</span></button><span class="att-tag">${pillStatus(c)}</span></li>`).join("") || `<li class="empty-inline">Nothing due. Set a next-action date on a candidate you need to call back.</li>`;
   const css = getComputedStyle(document.documentElement), A = css.getPropertyValue("--accent").trim(), I = css.getPropertyValue("--info").trim(), OK = css.getPropertyValue("--ok").trim(), W = css.getPropertyValue("--warn").trim(), B = css.getPropertyValue("--bad").trim(), M = css.getPropertyValue("--line-2").trim();
   const PAL = [I, A, OK, W, "#0e7490", "#be185d"];
   const labels = ids.map(roleName);
@@ -843,7 +844,7 @@ async function saveDrawer(c, noAnswer = false) {
 /* ---------- module registration ---------- */
 const VIEW_DEFS = [
   { id: "dashboard", title: "Dashboard", sub: "Live picture of the screening", icon: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>' },
-  { id: "candidates", title: "Candidates", sub: "Pick a role, then tap a row to log a call", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>' },
+  { id: "candidates", title: "Candidates", sub: "Pick a role, then tap a row to log a call", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>' , primary: { label: "Add candidate", run: () => openAddDrawer(S.role), can: () => !ro() && !!S.role && !!S.loaded }},
   { id: "interview", title: "Second Interview", nav: "Interview", sub: "Candidates who met the criteria, best first", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
   { id: "issues", title: "Data issues", nav: "Issues", sub: "Register problems to resolve before trusting a record", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>' },
   { id: "import", title: "Import a role", nav: "Import", sub: "Upload the Jobberman applicant export for a new role", icon: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>' },
@@ -864,12 +865,35 @@ FR.registerModule({
     if (started) return; started = true;
     S.db.doc("settings/scoring").onSnapshot(s => { if (s.exists) { const d = s.data(); S.settings = { ...DEFAULT_SETTINGS, location: d.location || DEFAULT_SETTINGS.location, qualification: d.qualification || DEFAULT_SETTINGS.qualification, availability: d.availability || DEFAULT_SETTINGS.availability, relocation: d.relocation ?? 10 }; } render(); }, () => {});
     S.db.collection("roles").onSnapshot(s => { S.all.roles = {}; for (const d of s.docs) S.all.roles[d.id] = { id: d.id, ...d.data() }; scope(); render(); }, () => {});
-    S.db.collection("candidates").onSnapshot(s => { S.all.cands = {}; for (const d of s.docs) S.all.cands[d.id] = { id: d.id, ...d.data() }; S.loaded = true; scope(); setSync(true, "live"); render(); if (S.open && S.open !== "new" && !S.cands[S.open]) closeDrawer(); }, e => { setSync(false, "disconnected"); notice("bad", "Could not load candidates (" + (e.message || e.code) + "). Reload the page."); });
+    S.db.collection("candidates").onSnapshot(s => { S.all.cands = {}; for (const d of s.docs) S.all.cands[d.id] = { id: d.id, ...d.data() }; S.loaded = true; scope(); setSync(true, "live"); render(); FR.attentionChanged?.(); if (S.open && S.open !== "new" && !S.cands[S.open]) closeDrawer(); }, e => { setSync(false, "disconnected"); notice("bad", "Could not load candidates (" + (e.message || e.code) + "). Reload the page."); });
     S.db.collection("issues").onSnapshot(s => { S.all.issues = {}; for (const d of s.docs) S.all.issues[d.id] = { id: d.id, ...d.data() }; scope(); render(); }, () => {});
     setupExport();
   },
   onCompany() { S.role = null; S.sel.clear(); S.imp = null; if (S.open) closeDrawer(); scope(); render(); },
   render, headerDownload: true, closeDrawer, closeDownload,
+  ready: () => !!S.loaded,
+  // Home: the calls and fixes waiting, most urgent first
+  attention() {
+    if (!S.loaded) return [];
+    const comp = compute(), all = Object.values(S.cands), today = new Date().toISOString().slice(0, 10);
+    const open = c => () => { setView("candidates", { role: c.role, filters: {} }); openDrawer(c.id); };
+    const due = all.filter(c => c.nextAction && c.nextAction <= today && c.status !== "contacted").sort((a, b) => a.nextAction.localeCompare(b.nextAction));
+    const late = due.filter(c => c.nextAction < today);
+    const pending = all.filter(c => effStatus(c) === "pending").sort((a, b) => comp[a.id].rank - comp[b.id].rank);
+    const issues = Object.values(S.issues).filter(i => !i.resolved);
+    const toBook = all.filter(c => comp[c.id].eligible && !(c.interview || {}).date && !(c.interview || {}).outcome);
+    return [
+      { id: "followups", level: late.length ? "bad" : "warn", label: "Call-backs due", count: due.length, hint: late.length ? `${late.length} overdue` : "due today", go: () => setView("candidates", { filters: {} }), items: due.slice(0, 5).map(c => ({ title: c.name, meta: `${roleName(c.role)} · call back ${c.nextAction}${c.phone ? " · " + c.phone : ""}`, go: open(c) })) },
+      { id: "book", level: "warn", label: "Interviews to book", count: toBook.length, hint: "meet the criteria, no date yet", go: () => setView("interview"), items: toBook.slice(0, 3).map(c => ({ title: c.name, meta: `${roleName(c.role)} · ${c.availability || ""}`, go: () => setView("interview") })) },
+      { id: "issues", level: "warn", label: "Data issues", count: issues.length, hint: "records to check", go: () => setView("issues"), items: [] },
+      { id: "pending", level: "info", label: "Not yet contacted", count: pending.length, hint: "candidates waiting for a first call", go: () => setView("candidates", { filters: { status: "pending" } }), items: pending.slice(0, 3).map(c => ({ title: c.name, meta: `${roleName(c.role)} · rank ${comp[c.id].rank}`, go: open(c) })) },
+    ];
+  },
+  search(q) {
+    q = q.toLowerCase(); const digits = q.replace(/\D/g, "");
+    return Object.values(S.cands).filter(c => (c.name || "").toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q) || (digits.length >= 4 && String(c.phone || "").replace(/\D/g, "").includes(digits)))
+      .slice(0, 8).map(c => ({ title: c.name, meta: `Candidate · ${roleName(c.role)}${c.phone ? " · " + c.phone : ""}`, go: () => { setView("candidates", { role: c.role, filters: {} }); openDrawer(c.id); } }));
+  },
   async markHired(candidateId, staffId) {
     const c = S.all.cands[candidateId]; if (!c) return;
     const body = { ...c, interview: { ...(c.interview || {}), outcome: "Hired", staffId: staffId || null }, history: [...(c.history || []), { ts: new Date().toISOString(), by: S.me?.id || null, summary: "Added to staff (People)" }].slice(-50) };

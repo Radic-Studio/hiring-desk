@@ -29,7 +29,7 @@ async function load(what = ["staff", "docs", "leave"]) {
     jobs.push(SB().from("leave_requests").select("*").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => { P.all.leave = data || []; }));   // managers: all; others: their own
     jobs.push(SB().rpc("leave_calendar", { p_company: S.company }).then(({ data }) => { P.cal = data || []; }));   // approved leave, names and dates only
   }
-  await Promise.all(jobs); scope(); render();
+  await Promise.all(jobs); P.loaded = true; scope(); render(); FR.attentionChanged?.(); if (S.module === "people") FR.paintPrimary?.();
   if (P.open && P.open !== "new" && !$("#drawer").classList.contains("open")) P.open = null;
   else if (P.open) paintDrawer();
 }
@@ -58,27 +58,25 @@ function renderStaff() {
   let list = P.staff.filter(s => !P.status ? s.status === "active" : P.status === "away" ? onLeaveToday(s) : s.status === P.status);
   if (q) list = list.filter(s => [s.full_name, s.position, s.department, s.phone, s.email].join(" ").toLowerCase().includes(q));
   el.innerHTML = `
-    <div class="tiles">
-      <div class="tile" data-f=""><span class="label">Active staff</span><span class="value">${active.length}</span><span class="sub">in ${esc(FR.companyShort(S.company))}</span></div>
-      <div class="tile" data-f="away"><span class="label">On leave today</span><span class="value">${away.length}</span><span class="sub">approved leave</span></div>
-      <div class="tile" data-f=""><span class="label">Joined ${year}</span><span class="value">${joined.length}</span><span class="sub">by start date</span></div>
-      <div class="tile" data-f="left"><span class="label">Left</span><span class="value">${left.length}</span><span class="sub">no longer with us</span></div>
+    <div class="stat-row" role="group" aria-label="Show">
+      <button type="button" class="stat" data-f="" aria-pressed="${!P.status}"><span class="stat-label">Active staff</span><span class="stat-value">${active.length}</span><span class="stat-hint">in ${esc(FR.companyShort(S.company))}${joined.length ? ` · ${joined.length} joined ${year}` : ""}</span></button>
+      <button type="button" class="stat ${away.length ? "info" : "clear"}" data-f="away" aria-pressed="${P.status === "away"}"><span class="stat-label">On leave today</span><span class="stat-value">${away.length}</span><span class="stat-hint">approved leave</span></button>
+      <button type="button" class="stat clear" data-f="left" aria-pressed="${P.status === "left"}"><span class="stat-label">Left</span><span class="stat-value">${left.length}</span><span class="stat-hint">no longer with us</span></button>
     </div>
     <div class="toolbar">
-      <input type="search" id="st-q" placeholder="Search name, position, phone…" value="${esc(P.q)}">
-      <select id="st-status"><option value="">Active</option><option value="away" ${P.status === "away" ? "selected" : ""}>On leave today</option><option value="left" ${P.status === "left" ? "selected" : ""}>Left</option></select>
-      ${canManage() ? `<button class="btn primary" id="st-add" style="margin-left:auto">+ Add staff</button>` : ""}
+      <input type="search" id="st-q" placeholder="Search name, position, phone…" aria-label="Search staff" value="${esc(P.q)}">
+      <select id="st-status" aria-label="Status"><option value="">Active</option><option value="away" ${P.status === "away" ? "selected" : ""}>On leave today</option><option value="left" ${P.status === "left" ? "selected" : ""}>Left</option></select>
     </div>
     ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Position</th><th>Phone</th><th>Email</th><th>Type</th><th>Started</th><th>Status</th><th></th></tr></thead><tbody>
-      ${list.map(s => `<tr data-id="${s.id}" style="cursor:pointer"><td class="name"><div style="display:flex;align-items:center;gap:10px">${FR.avatarHtml({ name: s.full_name, photo_url: s.photo_url })}<div>${esc(s.full_name || "(no name)")}${s.member_email ? `<span class="sub">signs in as ${esc(s.member_email)}</span>` : ""}</div></div></td>
-        <td>${esc(s.position || "—")}${s.department ? `<span class="sub">${esc(s.department)}</span>` : ""}</td><td>${esc(s.phone || "—")}</td><td>${esc(s.email || "—")}</td><td>${TYPE[s.employment_type] || ""}</td><td>${when(s.start_date) || "—"}</td><td>${statusPill(s)}</td><td><button class="btn small" data-open="${s.id}">${canManage() ? "Open" : "View"}</button></td></tr>`).join("")}
+      ${list.map(s => `<tr data-id="${s.id}" style="cursor:pointer"><td class="name"><div style="display:flex;align-items:center;gap:10px">${FR.avatarHtml({ name: s.full_name, photo_url: s.photo_url })}<div><button type="button" class="rowlink" data-open="${s.id}">${esc(s.full_name || "(no name)")}</button>${s.member_email ? `<span class="sub">signs in as ${esc(s.member_email)}</span>` : ""}</div></div></td>
+        <td>${esc(s.position || "—")}${s.department ? `<span class="sub">${esc(s.department)}</span>` : ""}</td><td>${esc(s.phone || "—")}</td><td>${esc(s.email || "—")}</td><td>${TYPE[s.employment_type] || ""}</td><td>${when(s.start_date) || "—"}</td><td>${statusPill(s)}</td><td><button class="btn small" data-open="${s.id}" aria-label="${canManage() ? "Open" : "View"} ${esc(s.full_name || "")}">${canManage() ? "Open" : "View"}</button></td></tr>`).join("")}
       </tbody></table></div>` : `<div class="empty"><h2>${P.q || P.status ? "Nothing matches" : "No staff yet"}</h2><p>${canManage() ? "Add people with the button above, or open a hired candidate in Hiring and use “Add to staff”." : "Staff records appear here once an Admin or Manager adds them."}</p></div>`}`;
   $("#st-q").oninput = e => { P.q = e.target.value; renderStaff(); setTimeout(() => $("#st-q")?.focus(), 0); };
   $("#st-status").onchange = e => { P.status = e.target.value; renderStaff(); };
   $("#st-add")?.addEventListener("click", () => openDrawer("new"));
   el.querySelectorAll("[data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); openDrawer(b.dataset.open); });
   el.querySelectorAll("tr[data-id]").forEach(r => r.onclick = () => openDrawer(r.dataset.id));
-  el.querySelectorAll(".tile[data-f]").forEach(t => t.onclick = () => { P.status = t.dataset.f; renderStaff(); });
+  el.querySelectorAll(".stat[data-f]").forEach(t => t.onclick = () => { P.status = t.dataset.f; renderStaff(); });
 }
 const staffName = id => (P.all.staff.find(s => s.id === id) || {}).full_name || "Unknown";
 function leaveRow(l, actions) {
@@ -93,13 +91,13 @@ function renderLeave() {
   const current = approvedLeave().filter(l => l.end_date >= t).sort((a, b) => a.start_date.localeCompare(b.start_date));
   const myLeave = mine ? P.all.leave.filter(l => l.staff_id === mine.id).slice(0, 20) : [];
   el.innerHTML = `
-    ${canManage() ? `<div class="card"><h2>To decide <small>${toDecide.length ? toDecide.length + " waiting" : "nothing waiting"}</small></h2><div class="team-list">${toDecide.map(l => leaveRow(l, `<input type="text" id="ln-${l.id}" placeholder="Note (optional)" style="min-width:160px"><button class="btn small primary" data-decide="${l.id}" data-s="approved">Approve</button><button class="btn small danger" data-decide="${l.id}" data-s="declined">Decline</button>`)).join("") || `<p class="muted">Requests from staff in ${esc(FR.companyName(S.company))} appear here.</p>`}</div></div>` : ""}
+    ${canManage() ? `<div class="card"><h2>To decide <small>${toDecide.length ? toDecide.length + " waiting" : "nothing waiting"}</small></h2><div class="team-list">${toDecide.map(l => leaveRow(l, `<input type="text" id="ln-${l.id}" placeholder="Note (optional)" aria-label="Note to ${esc(staffName(l.staff_id))} (optional)" style="min-width:160px"><button class="btn small primary" data-decide="${l.id}" data-s="approved">Approve</button><button class="btn small danger" data-decide="${l.id}" data-s="declined">Decline</button>`)).join("") || `<p class="muted">Requests from staff in ${esc(FR.companyName(S.company))} appear here.</p>`}</div></div>` : ""}
     <div class="team-grid">
       <div class="card"><h2>Away now and upcoming <small>approved</small></h2><div class="team-list">${current.map(l => leaveRow(l)).join("") || `<p class="muted">Nobody is on approved leave.</p>`}</div></div>
       <div class="card"><h2>My leave <small>${mine ? esc(mine.full_name) : "no staff record linked to your login"}</small></h2>
-        ${mine ? `<div class="fields"><div class="field"><label>Type</label><select id="ml-kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div><div class="field"><label>&nbsp;</label><span class="hint">Weekends count as days; say so in the reason if they should not.</span></div>
-          <div class="field"><label>From</label><input type="date" id="ml-start" value="${t}"></div><div class="field"><label>To</label><input type="date" id="ml-end" value="${t}"></div>
-          <div class="field wide"><label>Reason <span class="muted">(optional)</span></label><input id="ml-reason" placeholder="e.g. family event"></div></div>
+        ${mine ? `<div class="fields"><div class="field"><label for="ml-kind">Type</label><select id="ml-kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div><div class="field"><label>&nbsp;</label><span class="hint">Weekends count as days; say so in the reason if they should not.</span></div>
+          <div class="field"><label for="ml-start">From</label><input type="date" id="ml-start" value="${t}"></div><div class="field"><label for="ml-end">To</label><input type="date" id="ml-end" value="${t}"></div>
+          <div class="field wide"><label for="ml-reason">Reason <span class="muted">(optional)</span></label><input id="ml-reason" placeholder="e.g. family event"></div></div>
           <p class="hint" id="ml-err" style="color:var(--bad)"></p>
           <div class="toolbar" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="ml-go">Send request</button></div>
           <div class="team-list" style="margin-top:12px">${myLeave.map(l => leaveRow(l, l.status === "pending" ? `<button class="btn small" data-cancel="${l.id}">Cancel</button>` : "")).join("")}</div>` : `<p class="muted">An Admin or Manager links your login to your staff record (Staff → open your record → “Signs in as”). After that you can request leave here.</p>`}
@@ -312,8 +310,8 @@ function fromCandidate(c, roleName) {
 FR.registerModule({
   id: "people", name: "People", icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/></svg>',
   views: [
-    { id: "staff", title: "Staff", sub: "Everyone who works here: details, documents and leave", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.5"/><path d="M5 18a4 4 0 0 1 8 0M14 9h4M14 13h4"/></svg>' },
-    { id: "leave", title: "Leave", sub: "Requests to decide, and who is away when", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M9 15l2 2 4-4"/></svg>' },
+    { id: "staff", title: "Staff", sub: "Everyone who works here: details, documents and leave", count: true, primary: { label: "Add staff", run: () => openDrawer("new"), can: canManage }, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.5"/><path d="M5 18a4 4 0 0 1 8 0M14 9h4M14 13h4"/></svg>' },
+    { id: "leave", title: "Leave", sub: "Requests to decide, and who is away when", count: true, primary: { label: "Request leave", run: () => document.getElementById("ml-kind")?.focus(), can: () => !!myStaff() }, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M9 15l2 2 4-4"/></svg>' },
   ],
   start() {
     if (P.started) return; P.started = true;
@@ -322,5 +320,21 @@ FR.registerModule({
   },
   onCompany() { P.q = ""; P.status = ""; if (P.open) closeDrawer(); scope(); render(); },
   render, closeDrawer, fromCandidate,
+  ready: () => !!P.loaded,
+  attention() {
+    if (!P.loaded) return [];
+    const pend = pendingToDecide().sort((a, b) => (a.start_date || "").localeCompare(b.start_date || ""));
+    const name = id => (P.all.staff.find(s => s.id === id) || {}).full_name || "Staff member";
+    const away = P.staff.filter(s => s.status === "active" && onLeaveToday(s));
+    return [
+      { id: "leave", level: "warn", label: "Leave to decide", count: pend.length, hint: "requests waiting for a manager", go: () => FR.setView("leave"), items: pend.slice(0, 4).map(l => ({ title: name(l.staff_id), meta: `${KIND[l.kind] || "Leave"} · ${when(l.start_date)} to ${when(l.end_date)}`, go: () => FR.setView("leave") })) },
+      { id: "away", level: "info", label: "On leave today", count: away.length, hint: "not in the office", go: () => { P.status = "away"; FR.setView("staff"); }, items: [] },
+    ];
+  },
+  search(q) {
+    q = q.toLowerCase();
+    return P.staff.filter(s => [s.full_name, s.position, s.department, s.phone, s.email].join(" ").toLowerCase().includes(q)).slice(0, 6)
+      .map(s => ({ title: s.full_name, meta: `Staff · ${s.position || ""}${s.status === "left" ? " · left" : ""}`, go: () => { FR.setView("staff"); openDrawer(s.id); } }));
+  },
 });
 })();

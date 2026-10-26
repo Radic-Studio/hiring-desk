@@ -861,7 +861,13 @@ p.flag{margin:0 0 8px}
   main{padding:16px 16px calc(84px + env(safe-area-inset-bottom,0px))}
   .head-row{flex-wrap:nowrap;gap:8px}
   .crumb{display:none}
-  .head h1{font-size:22px}
+  .head h1{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .title-line{flex-wrap:nowrap;min-width:0}
+  .titles{overflow:hidden}
+  .co-badge{display:none!important}
+  .sync span{display:none}
+  .bk-chip{max-width:30px;overflow:hidden;white-space:nowrap;padding:0 8px;text-indent:-999px;position:relative}
+  .bk-chip::before{content:"!";position:absolute;left:0;right:0;text-indent:0;text-align:center;font-weight:700}
   .gsearch{display:none}
   .search-btn{display:inline-flex}
   body.search-open .gsearch{display:flex;position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top,0px));width:auto;height:44px;z-index:40;box-shadow:var(--shadow-lg)}
