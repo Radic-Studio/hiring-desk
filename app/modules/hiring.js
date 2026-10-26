@@ -674,7 +674,7 @@ function openRoleMenu(rid) {
     <div class="opts">
       ${closed ? `<button class="opt" id="rm-reopen" style="text-align:left"><div><b>Reopen recruitment</b><span>Brings the role back to Candidates, the dashboard and the interview list.</span></div></button>`
                : `<button class="opt" id="rm-close" style="text-align:left"><div><b>End recruitment</b><span>Keeps everything, records today's numbers, and moves the role to History. Nothing is deleted; you can reopen later.</span></div></button>`}
-      <button class="opt" id="rm-delete" style="text-align:left"><div><b style="color:var(--bad)">Delete role permanently</b><span>Removes the role, all ${st.total} candidates, their call history and ${st.issues} open issue${st.issues === 1 ? "" : "s"}. Cannot be undone. Download the role first if you might need it.</span></div></button>
+      <button class="opt" id="rm-delete" style="text-align:left"><div><b style="color:var(--bad)">Delete role</b><span>Hides the role, all ${st.total} candidates, their call history and ${st.issues} open issue${st.issues === 1 ? "" : "s"} from everyone. A Group Admin can restore them from Recently deleted.</span></div></button>
     </div>
     <div id="rm-confirm"></div>
     <div class="toolbar"><button class="btn" id="rm-dl">Download this role</button><button class="btn" id="rm-cancel" style="margin-left:auto">Close</button></div>`;
@@ -690,14 +690,15 @@ function openRoleMenu(rid) {
   });
 }
 async function deleteRole(rid) {
-  const r = roleOf(rid), cs = byRole(rid), is = Object.values(S.issues).filter(i => cs.some(c => c.id === i.candidateId)); const total = cs.length + is.length + 1; let done = 0;
-  $("#rm-prog").hidden = false; $("#rm-yes").disabled = true; $("#rm-no").disabled = true;
-  try {
-    for (const c of cs) { await S.db.doc("candidates/" + c.id).delete(); $("#rm-prog i").style.width = Math.round(++done / total * 100) + "%"; }
-    for (const i of is) { await S.db.doc("issues/" + i.id).delete(); $("#rm-prog i").style.width = Math.round(++done / total * 100) + "%"; }
-    if (S.roles[rid]) await S.db.doc("roles/" + rid).delete();
-    toast(`${r.name} deleted: ${cs.length} candidates and ${is.length} issues removed`, "warn"); logAct("warn", `Role deleted: ${r.name}`, `${cs.length} candidates, ${is.length} issues`); closeDownload(); S.role = null; setView("candidates");
-  } catch (e) { toast("Delete stopped: " + (e?.message || e?.code || "unknown") + ". Some records may already be gone; open the role again to retry.", "bad"); }
+  const r = roleOf(rid), cs = byRole(rid);
+  $("#rm-prog").hidden = false; $("#rm-yes").disabled = true; $("#rm-no").disabled = true; $("#rm-prog i").style.width = "50%";
+  const res = await FR.softDelete("roles", rid);   // the server takes the role's candidates and issues with it, in one step
+  $("#rm-prog i").style.width = "100%";
+  if (!res.ok) { toast("Not deleted: " + res.error, "bad"); $("#rm-yes").disabled = false; $("#rm-no").disabled = false; return; }
+  const ch = res.deletion?.children || {};
+  toast(`${r.name} deleted with ${ch.candidates || 0} candidates and ${ch.issues || 0} issues. A Group Admin can restore it.`, "warn");
+  logAct("warn", `Role deleted: ${r.name}`, `${ch.candidates || cs.length} candidates, ${ch.issues || 0} issues · restorable from Recently deleted`);
+  closeDownload(); S.role = null; setView("candidates");
 }
 function renderHistory(comp) {
   const el = $("#v-history"); const closed = allRoleIds().filter(r => roleOf(r).status === "closed");
@@ -736,19 +737,17 @@ function openAddDrawer(rid) {
   $("#a-addr").addEventListener("input", e => { const [l, s] = classify(e.target.value); $("#a-loc").value = l; if (s) $("#a-state").value = s; });
   $("#a-save").addEventListener("click", async () => {
     const v = id => $("#" + id).value.trim(); const name = v("a-name"); if (!name) { toast("A name is required"); $("#a-name").focus(); return; }
-    const role = v("a-role"), sn = nextSn(role); let phone = v("a-phone").replace(/[^\d+]/g, ""); if (/^\d{10}$/.test(phone)) phone = "0" + phone; if (phone.startsWith("+234")) phone = "0" + phone.slice(4); else if (phone.startsWith("234")) phone = "0" + phone.slice(3);
+    const role = v("a-role"); let sn = nextSn(role);
+    { const { data: top } = await FR.SB.from("candidates").select("sn").eq("role", role).order("sn", { ascending: false }).limit(1); if (top?.[0]) sn = Math.max(sn, Number(top[0].sn) + 1); }   // Group Admins also see deleted rows, so a deleted serial is never reused let phone = v("a-phone").replace(/[^\d+]/g, ""); if (/^\d{10}$/.test(phone)) phone = "0" + phone; if (phone.startsWith("+234")) phone = "0" + phone.slice(4); else if (phone.startsWith("234")) phone = "0" + phone.slice(3);
     const dup = Object.values(S.cands).find(c => phone && c.phone === phone); if (dup && !$("#a-save").dataset.ok) { toast(`That number already belongs to ${dup.name}. Press again to add anyway.`); $("#a-save").dataset.ok = "1"; return; }
     const body = { role, sn, name, phone, email: v("a-email"), address: v("a-addr"), qualification: v("a-qual"), location: v("a-loc"), state: v("a-state"), status: "pending", attempts: 0, mode: "", availability: "", relocation: "", manual: "", adjust: 0, notes: v("a-notes"), portfolio: "", nextAction: "", lastContact: new Date().toISOString(), lastBy: S.me?.id || null, addedBy: S.me?.id || null, addedManually: true, history: [{ ts: new Date().toISOString(), by: S.me?.id || null, summary: "Added manually" }] };
     if (await write(S.db.doc("candidates/" + candId(role, sn)), body, `${name} added to ${roleName(role)}`)) { closeDrawer(); if (S.view === "candidates") { S.role = role; } }
   });
 }
 async function removeCandidate(c) {
-  const related = Object.values(S.issues).filter(i => i.candidateId === c.id);
-  try {
-    await S.db.doc("candidates/" + c.id).delete();
-    for (const i of related) await S.db.doc("issues/" + i.id).delete();
-    toast(`${c.name} removed`, "warn"); closeDrawer();
-  } catch (e) { toast("Could not remove: " + (e?.message || e?.code || "unknown error"), "bad"); }
+  const res = await FR.softDelete("candidates", c.id);   // linked issues go with the candidate
+  if (!res.ok) { toast("Could not remove: " + res.error, "bad"); return; }
+  toast(`${c.name} removed. A Group Admin can restore them.`, "warn"); closeDrawer();
 }
 
 /* ---------- drawer ---------- */
@@ -805,7 +804,7 @@ function openDrawer(id) {
   $("#rec-reply")?.addEventListener("click", () => { for (const x of $("#status").children) x.setAttribute("aria-pressed", x.dataset.v === "contacted"); $("#f-mode").value = "Email"; $("#f-avail").focus(); toast("Set their availability and location, then Save", "warn"); });
   $("#rm")?.addEventListener("click", () => {
     const n = Object.values(S.issues).filter(i => i.candidateId === c.id).length;
-    $("#rm-box").innerHTML = `<div class="confirm"><b>Remove ${esc(c.name)}?</b><span>This deletes the record, its call history${n ? ` and ${n} linked data issue${n === 1 ? "" : "s"}` : ""} for everyone, and from the next hourly Google Sheet refresh. It cannot be undone from the page.</span><div class="toolbar"><button class="btn small danger" id="rm-yes">Yes, remove</button><button class="btn small" id="rm-no">Keep</button></div></div>`;
+    $("#rm-box").innerHTML = `<div class="confirm"><b>Remove ${esc(c.name)}?</b><span>This hides the record, its call history${n ? ` and ${n} linked data issue${n === 1 ? "" : "s"}` : ""} from everyone, and from the next hourly Google Sheet refresh. A Group Admin can restore it from Recently deleted.</span><div class="toolbar"><button class="btn small danger" id="rm-yes">Yes, remove</button><button class="btn small" id="rm-no">Keep</button></div></div>`;
     $("#rm-yes").onclick = () => removeCandidate(c); $("#rm-no").onclick = () => { $("#rm-box").innerHTML = `<button class="btn small danger" id="rm">Remove from ${esc(rl.name)}</button>`; $("#rm").onclick = () => openDrawer(id); };
   });
   const copyNum = async (msg) => { try { await navigator.clipboard.writeText(c.phone); toast(msg); } catch { const r = document.createRange(); r.selectNodeContents($(".phone-row .num")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Select and copy the number"); } };

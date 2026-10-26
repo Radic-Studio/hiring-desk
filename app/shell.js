@@ -18,20 +18,22 @@ function applyCompanyAccess() {
 }
 
 /* ---------- navigation: companies × modules × views ---------- */
-const SHELL_VIEWS = { team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" } };
+const SHELL_VIEWS = { team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" },
+  deleted: { id: "deleted", title: "Recently deleted", sub: "Deleted records are kept here until a Group Admin restores them or removes them for good" } };
 // Hiring is a group-level function: only Group Admins (CEO, Directors, General Supervisor) see it, whichever company is selected.
 function companyModules(cid) { const c = S.companies.find(x => x.id === cid); return (c?.modules || ["hiring"]).filter(id => id !== "hiring" || isGroupAdmin()).map(id => FR.modules[id]).filter(Boolean); }
 function viewDef(v) { if (SHELL_VIEWS[v]) return SHELL_VIEWS[v]; for (const m of companyModules(S.company)) { const d = m.views.find(x => x.id === v); if (d) return { ...d, module: m.id }; } return null; }
 function buildNav() {
   const mods = companyModules(S.company);
   $("#tabs").innerHTML = mods.map(m => `<div class="nav-group">${mods.length > 1 ? `<div class="nav-head">${esc(m.name)}</div>` : ""}${m.views.map(v => `<button role="tab" data-view="${v.id}" title="${esc(v.nav || v.title)}">${v.icon || ""}<span class="lbl">${esc(v.nav || v.title)}</span>${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</button>`).join("")}</div>`).join("")
-    + (canManageTeam() ? `<div class="nav-group"><div class="nav-head">Group</div><button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button></div>` : "");
+    + (canManageTeam() || isGroupAdmin() ? `<div class="nav-group"><div class="nav-head">Group</div>${canManageTeam() ? `<button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button>` : ""}${isGroupAdmin() ? `<button role="tab" data-view="deleted" id="tab-deleted" title="Recently deleted"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="lbl">Recently deleted</span><span class="cnt" id="cnt-deleted" hidden>0</span></button>` : ""}</div>` : "");
   // one section per view, created once
   const main = $("main");
   for (const m of Object.values(FR.modules)) for (const v of m.views) if (!$("#v-" + v.id)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v.id; s.hidden = true; main.appendChild(s); }
-  if (!$("#v-team")) { const s = document.createElement("section"); s.className = "view"; s.id = "v-team"; s.hidden = true; main.appendChild(s); }
-  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge();
+  for (const v of Object.keys(SHELL_VIEWS)) if (!$("#v-" + v)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v; s.hidden = true; main.appendChild(s); }
+  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintDeletedBadge();
 }
+function paintDeletedBadge() { const c = $("#cnt-deleted"); if (!c) return; const n = DEL.open.length; c.textContent = n; c.hidden = !n; }
 const CO_ICON = { press: "./app/brand/app_icon_press.svg", events: "./app/brand/app_icon_events.svg" };
 function paintCompanyBadge() {
   const b = $("#co-badge"); if (!b) return; const c = S.companies.find(x => x.id === S.company);
@@ -71,6 +73,7 @@ function defaultCompany() {
   return (ok.find(c => c.id === saved) || ok.find(c => c.kind === "group") || ok[0] || {}).id || null;
 }
 function setView(v, opts = {}) {
+  if (v === "deleted" && !isGroupAdmin()) v = "dashboard";
   let d = viewDef(v); if (!d) { v = "dashboard"; d = viewDef(v); }
   if (!d) { v = "team"; d = SHELL_VIEWS.team; }
   S.view = v; S.module = d.module || null;
@@ -396,7 +399,7 @@ async function enter(session) {
   FR.paintRole(); setSync(true, "live");
   logAct("ok", `Signed in as ${S.me.name} (${roleLabel()}, ${FR.companyName(S.company)})`);
   for (const m of Object.values(FR.modules)) m.start?.();
-  loadMembers();
+  loadMembers(); if (isGroupAdmin()) loadDeleted();
   FR.subscribe("companies", async () => { const { data } = await SB().from("companies").select("*").order("order"); if (data) { S.companies = data; buildNav(); if (S.view === "team") FR.render(); } });
   setView(r.view && viewDef(r.view) ? r.view : "dashboard");
   if (!access.profile_done) openProfile(true);
@@ -497,6 +500,55 @@ $("#pf-scrim").addEventListener("click", e => { if (e.target === $("#pf-scrim") 
 /* ---------- Team page (Group Admins: everything; company Admins: their company) ---------- */
 const roleOpts = (sel, withNone) => (withNone ? `<option value="">No access</option>` : "") + ["viewer", "staff", "manager", "admin"].map(r => `<option value="${r}" ${sel === r ? "selected" : ""}>${ROLE_LABEL[r]}</option>`).join("");
 function cmRole(email, cid) { return (S.companyMembers.find(x => x.email.toLowerCase() === email.toLowerCase() && x.company_id === cid) || {}).role || ""; }
+/* ---------- Recently deleted (Group Admins) ---------- */
+const ENTITY_LABEL = { roles: "Hiring role", candidates: "Candidate", issues: "Data issue", staff: "Staff record", staff_documents: "Staff document", leave_requests: "Leave request",
+  press_customers: "Press customer", press_rate_items: "Rate card item", press_jobs: "Press job", press_payments: "Payment", press_materials: "Material", press_files: "Job file", customer_requests: "Customer request" };
+const DEL = { open: [], history: [], showHistory: false };
+async function loadDeleted() {
+  if (!isGroupAdmin()) return;
+  const [{ data: open }, { data: hist }] = await Promise.all([
+    SB().from("deletions").select("*").is("restored_at", null).is("purged_at", null).order("deleted_at", { ascending: false }).limit(300),
+    SB().from("deletions").select("*").or("restored_at.not.is.null,purged_at.not.is.null").order("deleted_at", { ascending: false }).limit(50),
+  ]);
+  DEL.open = open || []; DEL.history = hist || [];
+  paintDeletedBadge();
+  if (S.view === "deleted") FR.renderDeleted();
+  if (!loadDeleted.sub) loadDeleted.sub = FR.subscribe("deletions", loadDeleted);
+}
+const who = e => { const m = e && S.members[String(e).toLowerCase()]; return m ? memberName(m) : (e || "?"); };
+const childText = ch => Object.entries(ch || {}).map(([k, n]) => `${n} ${(ENTITY_LABEL[k] || k).toLowerCase()}${n === 1 ? "" : "s"}`).join(", ");
+FR.renderDeleted = function renderDeleted() {
+  const el = $("#v-deleted"); if (!el) return;
+  if (!isGroupAdmin()) { el.innerHTML = `<p class="muted">Only Group Admins can see deleted records.</p>`; return; }
+  const row = (d, live) => `<div class="member del-row" data-id="${d.id}">
+      <div class="avatar" title="${esc(ENTITY_LABEL[d.entity] || d.entity)}">${esc((ENTITY_LABEL[d.entity] || "?").slice(0, 1))}</div>
+      <div style="min-width:0"><b>${esc(d.label || "(no name)")}</b><small>${esc(ENTITY_LABEL[d.entity] || d.entity)}${d.company_id ? " · " + esc(FR.companyShort(d.company_id) || d.company_id) : ""}${Object.keys(d.children || {}).length ? " · with " + esc(childText(d.children)) : ""}</small>
+        <small>Deleted by ${esc(who(d.deleted_by))} · ${when(d.deleted_at)}${d.restored_at ? ` · restored by ${esc(who(d.restored_by))} ${when(d.restored_at)}` : ""}${d.purged_at ? ` · removed for good by ${esc(who(d.purged_by))} ${when(d.purged_at)}` : ""}</small></div>
+      ${live ? `<div class="acts"><button class="btn small primary" data-restore="${d.id}">Restore</button><button class="btn small danger" data-purge="${d.id}">Delete permanently</button></div>` : ""}
+      <div class="del-confirm" id="pc-${d.id}" style="grid-column:1/-1"></div></div>`;
+  el.innerHTML = `<div class="card"><h2>Deleted records <small>${DEL.open.length} waiting · nothing is removed automatically</small></h2>
+      ${DEL.open.length ? `<div class="team-list">${DEL.open.map(d => row(d, true)).join("")}</div>` : `<p class="muted">Nothing deleted. When someone deletes a record anywhere in the system it appears here, with everything deleted along with it.</p>`}</div>
+    <div class="card"><h2>Restored and removed <button class="btn small" id="del-hist">${DEL.showHistory ? "Hide" : "Show"} the last ${DEL.history.length}</button></h2>
+      ${DEL.showHistory ? (DEL.history.length ? `<div class="team-list">${DEL.history.map(d => row(d, false)).join("")}</div>` : `<p class="muted">None yet.</p>`) : ""}</div>`;
+  $("#del-hist").onclick = () => { DEL.showHistory = !DEL.showHistory; FR.renderDeleted(); };
+  el.querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
+    const d = DEL.open.find(x => x.id === b.dataset.restore); b.disabled = true; b.textContent = "Restoring…";
+    const { error } = await SB().rpc("restore_deleted", { p_batch: d.id });
+    if (error) { b.disabled = false; b.textContent = "Restore"; toast(error.message, "bad"); return; }
+    toast(`${d.label} restored${Object.keys(d.children || {}).length ? " with " + childText(d.children) : ""}`, "ok"); logAct("ok", `Restored: ${d.label}`, ENTITY_LABEL[d.entity] || d.entity); loadDeleted();
+  });
+  el.querySelectorAll("[data-purge]").forEach(b => b.onclick = () => {
+    const d = DEL.open.find(x => x.id === b.dataset.purge); const box = $("#pc-" + d.id);
+    box.innerHTML = `<div class="confirm"><b>Delete permanently? This cannot be undone.</b><span>Type <b>${esc(d.label)}</b> to confirm. Stored files are not removed by this.</span>
+      <input id="pt-${d.id}" autocomplete="off" style="padding:8px 10px;border:1px solid var(--line-2);border-radius:8px"><div class="toolbar"><button class="btn small danger" id="py-${d.id}" disabled>Delete permanently</button><button class="btn small" id="pn-${d.id}">Keep</button></div></div>`;
+    const inp = $("#pt-" + d.id), yes = $("#py-" + d.id);
+    inp.oninput = () => { yes.disabled = inp.value.trim().toLowerCase() !== d.label.trim().toLowerCase(); }; inp.focus();
+    $("#pn-" + d.id).onclick = () => { box.innerHTML = ""; };
+    yes.onclick = async () => { yes.disabled = true; const { error } = await SB().rpc("purge_deleted", { p_batch: d.id, p_confirm: inp.value });
+      if (error) { yes.disabled = false; toast(error.message, "bad"); return; } toast(`${d.label} removed for good`, "warn"); logAct("warn", `Removed for good: ${d.label}`, ENTITY_LABEL[d.entity] || d.entity); loadDeleted(); };
+  });
+};
+
 FR.renderTeam = function renderTeam() {
   const el = $("#v-team"); if (!canManageTeam()) { el.innerHTML = ""; return; }
   const cid = S.company, team = S.team || [], me = S.me.email, ga = isGroupAdmin();

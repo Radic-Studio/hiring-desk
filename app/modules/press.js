@@ -34,7 +34,7 @@ async function load(what = ["customers", "rates", "jobs", "payments", "materials
   const T = { customers: "press_customers", rates: "press_rate_items", jobs: "press_jobs", payments: "press_payments", materials: "press_materials", moves: "press_material_moves", files: "press_files", requests: "customer_requests" };
   await Promise.all(what.map(async k => {
     if (k === "settings") { const { data } = await SB().from("company_settings").select("company_id,data").eq("module", "press"); P.all.settings = {}; for (const r of data || []) P.all.settings[r.company_id] = r.data || {}; return; }
-    const { data, error } = await SB().from(T[k]).select("*").limit(5000); if (error) { notice("bad", `Could not load ${k}: ${error.message}`); return; } P.all[k] = data || [];
+    const { data, error } = await FR.live(SB().from(T[k]).select("*"), T[k]).limit(5000); if (error) { notice("bad", `Could not load ${k}: ${error.message}`); return; } P.all[k] = data || [];
   }));
   scope(); render(); if (P.open && $("#drawer").classList.contains("open")) paintDrawer();
   if (P.reqOpen && $("#drawer").classList.contains("open")) openRequest(P.reqOpen, true);
@@ -220,7 +220,7 @@ function renderRates() {
   });
   el.querySelectorAll("[data-price]").forEach(i => i.onchange = async () => { const { error } = await SB().from("press_rate_items").update({ price: N(i.value), updated_at: new Date().toISOString(), updated_by: me() }).eq("id", i.dataset.price); if (error) toast(error.message, "bad"); else toast("Price saved", "ok"); });
   el.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => { const r = P.rates.find(x => x.id === b.dataset.toggle); await SB().from("press_rate_items").update({ active: !r.active }).eq("id", r.id); load(["rates"]); });
-  el.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this rate card item?")) return; const { error } = await SB().from("press_rate_items").delete().eq("id", b.dataset.del); if (error) toast(error.message, "bad"); else load(["rates"]); });
+  el.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this rate card item? A Group Admin can restore it.")) return; const r = await FR.softDelete("press_rate_items", b.dataset.del); if (!r.ok) toast(r.error, "bad"); else load(["rates"]); });
   $("#cf-save")?.addEventListener("click", async () => {
     const data = { business_name: $("#cf-name").value.trim(), address: $("#cf-addr").value.trim(), phone: $("#cf-phone").value.trim(), email: $("#cf-email").value.trim(), prefix: ($("#cf-prefix").value.trim().toUpperCase() || "FRP").replace(/[^A-Z0-9]/g, ""), deposit_pct: N($("#cf-dep").value), valid_days: N($("#cf-valid").value) || 14, vat_pct: N($("#cf-vat").value), bank_name: $("#cf-bank").value.trim(), account_name: $("#cf-acct").value.trim(), account_number: $("#cf-acno").value.trim(), terms: $("#cf-terms").value.trim() };
     const { error } = await SB().from("company_settings").upsert({ company_id: S.company, module: "press", data, updated_by: me(), updated_at: new Date().toISOString() }, { onConflict: "company_id,module" });
@@ -382,7 +382,7 @@ function paintPay(j, isNew, ro) {
   });
   $("#pj-body").querySelectorAll("[data-rpdf]").forEach(b => b.onclick = () => { const p = pays.find(x => x.id === b.dataset.rpdf); savePdf(receiptPdf(j, p), `${p.receipt_no}.pdf`); });
   $("#pj-body").querySelectorAll("[data-rmail]").forEach(b => b.onclick = () => emailDoc(j, "receipt", pays.find(x => x.id === b.dataset.rmail)));
-  $("#pj-body").querySelectorAll("[data-rdel]").forEach(b => b.onclick = async () => { const p = pays.find(x => x.id === b.dataset.rdel); if (!confirm(`Delete receipt ${p.receipt_no} (${money(p.amount)})? Only do this for a mistaken entry.`)) return; const { error } = await SB().from("press_payments").delete().eq("id", p.id); if (error) toast(error.message, "bad"); else { toast("Payment deleted", "warn"); load(["payments"]); } });
+  $("#pj-body").querySelectorAll("[data-rdel]").forEach(b => b.onclick = async () => { const p = pays.find(x => x.id === b.dataset.rdel); if (!confirm(`Delete receipt ${p.receipt_no} (${money(p.amount)})? Only do this for a mistaken entry. A Group Admin can restore it.`)) return; const r = await FR.softDelete("press_payments", p.id); if (!r.ok) toast(r.error, "bad"); else { toast("Payment deleted", "warn"); load(["payments"]); } });
 }
 function paintFiles(j, isNew, ro) {
   const files = P.files.filter(f => f.job_id === j.id);
@@ -398,7 +398,7 @@ function paintFiles(j, isNew, ro) {
     if (e2) { $("#pf-err").textContent = e2.message; $("#pf-up").disabled = false; return; } toast("File uploaded", "ok"); load(["files"]);
   });
   $("#pj-body").querySelectorAll("[data-fopen]").forEach(b => b.onclick = async () => { const f = files.find(x => x.id === b.dataset.fopen); const { data, error } = await SB().storage.from("press-files").createSignedUrl(f.file_path, 300); if (error) toast(error.message, "bad"); else window.open(data.signedUrl, "_blank", "noopener"); });
-  $("#pj-body").querySelectorAll("[data-fdel]").forEach(b => b.onclick = async () => { const f = files.find(x => x.id === b.dataset.fdel); if (!confirm(`Delete "${f.title}"?`)) return; await SB().storage.from("press-files").remove([f.file_path]); await SB().from("press_files").delete().eq("id", f.id); load(["files"]); });
+  $("#pj-body").querySelectorAll("[data-fdel]").forEach(b => b.onclick = async () => { const f = files.find(x => x.id === b.dataset.fdel); if (!confirm(`Delete "${f.title}"? A Group Admin can restore it.`)) return; const r = await FR.softDelete("press_files", f.id); if (!r.ok) toast(r.error, "bad"); load(["files"]); });
 }
 function paintHistory(j) {
   $("#pj-body").innerHTML = `<ul class="history">${(j.history || []).slice().reverse().map(h => `<li><time>${FR.fmtDate(h.ts)}</time><span>${esc(h.summary)} <span class="muted" data-by="${esc(h.by || "")}"></span></span></li>`).join("") || `<li class="muted">Nothing yet.</li>`}</ul>`;
@@ -432,7 +432,7 @@ function editMaterial(m) {
     <div class="body"><div class="fields"><div class="field wide"><label>Name</label><input id="m-name" value="${esc(m.name)}" placeholder="e.g. A4 150gsm gloss paper"></div><div class="field"><label>Unit</label><input id="m-unit" value="${esc(m.unit)}" placeholder="sheet, ream, litre, roll"></div><div class="field"><label>Reorder when below</label><input type="number" id="m-re" value="${N(m.reorder_level)}" min="0" step="any"></div>${isNew ? `<div class="field"><label>Opening stock</label><input type="number" id="m-qty" value="0" min="0" step="any"></div>` : ""}<div class="field"><label>Unit cost (₦)</label><input type="number" id="m-cost" value="${N(m.unit_cost)}" min="0" step="0.01"></div><div class="field wide"><label>Notes</label><input id="m-notes" value="${esc(m.notes)}"></div></div><p class="hint" id="m-err" style="color:var(--bad)"></p></div>
     <footer>${isNew ? "" : `<button class="btn danger" id="m-del">Delete</button>`}<span style="flex:1"></span><button class="btn" id="m-close">Close</button><button class="btn primary" id="m-save">Save</button></footer>`;
   showDrawer(); $("#close").onclick = closeDrawer; $("#m-close").onclick = closeDrawer;
-  $("#m-del")?.addEventListener("click", async () => { if (!confirm(`Delete ${m.name} and its stock history?`)) return; const { error } = await SB().from("press_materials").delete().eq("id", m.id); if (error) toast(error.message, "bad"); else { closeDrawer(); load(["materials", "moves"]); } });
+  $("#m-del")?.addEventListener("click", async () => { if (!confirm(`Delete ${m.name}? Its stock history is kept, and a Group Admin can restore it.`)) return; const r = await FR.softDelete("press_materials", m.id); if (!r.ok) toast(r.error, "bad"); else { closeDrawer(); load(["materials", "moves"]); } });
   $("#m-save").onclick = async () => {
     const body = { company_id: S.company, name: $("#m-name").value.trim(), unit: $("#m-unit").value.trim() || "unit", reorder_level: N($("#m-re").value), unit_cost: N($("#m-cost").value), notes: $("#m-notes").value.trim(), updated_by: me(), updated_at: new Date().toISOString() };
     if (!body.name) { $("#m-err").textContent = "Name is required."; return; }

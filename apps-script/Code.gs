@@ -86,7 +86,9 @@ function sb(path, method, body, prefer) {
   if (res.getResponseCode() >= 300) throw new Error(path + " → " + res.getResponseCode() + " " + res.getContentText().slice(0, 300));
   const t = res.getContentText(); return t ? JSON.parse(t) : null;
 }
-const all = (table) => sb(table + "?select=*&limit=5000");
+// Deleted (soft-deleted) roles, candidates and issues are left out of the Sheet and of form matching; Group Admins restore them in the app.
+const SOFT_TABLES = ["roles", "candidates", "issues"];
+const all = (table) => sb(table + "?select=*&limit=5000" + (SOFT_TABLES.indexOf(table) >= 0 ? "&deleted_at=is.null" : ""));
 
 /* ---------- normalisation (same rules as the page) ---------- */
 const STATE_MAP = [["jos","Plateau"],["plateau","Plateau"],["lagos","Lagos"],["ikeja","Lagos"],["surulere","Lagos"],["lekki","Lagos"],["ikorodu","Lagos"],["ekiti","Ekiti"],["ogun","Ogun"],["abeokuta","Ogun"],["edo","Edo"],["benin","Edo"],["port harcourt","Rivers"],["rivers","Rivers"],["warri","Delta"],["asaba","Delta"],["delta","Delta"],["abuja","FCT (Abuja)"],["fct","FCT (Abuja)"],["anambra","Anambra"],["awka","Anambra"],["onitsha","Anambra"],["nnewi","Anambra"],["ibadan","Oyo"],["oyo","Oyo"],["imo","Imo"],["owerri","Imo"],["akure","Ondo"],["ondo","Ondo"],["abia","Abia"],["aba","Abia"],["umuahia","Abia"],["ebonyi","Ebonyi"],["abakaliki","Ebonyi"],["kaduna","Kaduna"],["kano","Kano"],["uyo","Akwa Ibom"],["akwa ibom","Akwa Ibom"],["calabar","Cross River"],["cross river","Cross River"],["benue","Benue"],["makurdi","Benue"],["nsukka","Enugu"],["enugu","Enugu"]];

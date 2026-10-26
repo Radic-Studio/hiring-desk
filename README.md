@@ -80,6 +80,14 @@ Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, 
 
 **Free-plan pausing.** Supabase pauses a Free project after 7 days without activity. While paused the app and portal cannot load data; data is kept. To restore: Supabase dashboard → the project → **Restore project** (takes a few minutes), then reload the app. No artificial traffic is generated to avoid pausing; the backup job reads the database every 6 hours as part of its real work.
 
+## Deleting and restoring (soft deletes)
+
+Nothing in the business tables is removed by an ordinary delete. Deleting a hiring role, candidate, staff record, staff document, rate-card item, payment, job file or material (and, by staff action, jobs, customers and customer requests) calls `soft_delete(entity, id)`: the row gets `deleted_at`, `deleted_by` and a `delete_batch`, and the rows that belong to it go with it in the same batch (role → its candidates and their issues; candidate → issues; staff → documents and leave; job → payments and files). One row in `deletions` records the action. A restrictive policy hides deleted rows from everyone except Group Admins; another lets only Group Admins hard-delete. The app always lists live rows only.
+
+Group Admins see **Group → Recently deleted**: what was deleted, by whom, when and with what. **Restore** (`restore_deleted`) brings the whole batch back; a child whose parent is still deleted must wait for the parent. **Delete permanently** (`purge_deleted`) needs the record's name typed exactly; nothing is ever purged automatically. Stored files are kept on soft delete (so a restore brings them back) and are not removed by a purge; remove them in Supabase Storage by hand if needed. Who may delete is unchanged: Hiring = Group Admins; jobs, customers, job files, customer requests = Staff and above in that company; staff records, documents, leave, rate card, materials, payments = Managers and Admins.
+
+The Hiring Sheet script (`apps-script/Code.gs`) leaves deleted roles, candidates and issues out of the Sheet and out of form matching; re-paste it into the Hiring Sheet's Apps Script to pick this up. Backups include deleted rows with their `deleted_at`, so a restore from backup keeps them deleted. Rollback notes are at the top of `supabase/migrations/20261026_soft_deletes.sql`; `supabase/rollback/stage2_policies_before.sql` holds the earlier policies.
+
 ## Adding a module
 
 Create `app/modules/<id>.js`, call `FR.registerModule({ id, name, views: [{ id, title, sub, icon, count? }], start(), onCompany(), render() })`, add the script tag to `index.html` before `app/shell.js`, and list the module id in `companies.modules` for the companies that use it.

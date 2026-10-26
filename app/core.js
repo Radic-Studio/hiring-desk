@@ -64,6 +64,12 @@ const subscribe = FR.subscribe = (table, run, id) => {
   subs[key] = FR.SB.channel("ch-" + key.replace(/[^a-z0-9]/gi, "-")).on("postgres_changes", { event: "*", schema: "public", table, ...(id ? { filter: "id=eq." + id } : {}) }, debounced).subscribe();
   return () => subs[key]?.unsubscribe();
 };
+// Tables with soft deletes: normal lists never show deleted rows (Group Admins see them under Recently deleted).
+const SOFT = FR.SOFT = new Set(["roles", "candidates", "issues", "staff", "staff_documents", "leave_requests", "press_customers", "press_rate_items", "press_jobs", "press_payments", "press_materials", "press_files", "customer_requests"]);
+const live = (q, table) => SOFT.has(table) ? q.is("deleted_at", null) : q;
+FR.live = live;
+/** Soft-delete one record (and what belongs to it). Returns { ok, error, deletion }. */
+FR.softDelete = async (table, id) => { const { data, error } = await FR.SB.rpc("soft_delete", { p_entity: table, p_id: String(id) }); return error ? { ok: false, error: error.message } : { ok: true, deletion: data }; };
 FR.dbShim = {
   doc(path) {
     const [table, id] = path.split("/");
@@ -72,13 +78,13 @@ FR.dbShim = {
         const row = table === "settings" ? { id, data: body } : { id, ...toRow(table, body) };
         const { error } = await FR.SB.from(table).upsert(row, { onConflict: "id" }); if (error) throw { code: error.code === "42501" ? "invalid_argument" : error.code, message: error.message };
       },
-      async delete() { const { error } = await FR.SB.from(table).delete().eq("id", id); if (error) throw { code: error.code, message: error.message }; },
-      async get() { const { data, error } = await FR.SB.from(table).select("*").eq("id", id).maybeSingle(); if (error) throw { code: error.code, message: error.message }; return { exists: !!data, data: () => data ? (table === "settings" ? data.data : fromRow(table, data)) : undefined }; },
+      async delete() { const r = await FR.softDelete(table, id); if (!r.ok) throw { code: "refused", message: r.error }; },
+      async get() { const { data, error } = await live(FR.SB.from(table).select("*").eq("id", id), table).maybeSingle(); if (error) throw { code: error.code, message: error.message }; return { exists: !!data, data: () => data ? (table === "settings" ? data.data : fromRow(table, data)) : undefined }; },
       onSnapshot(next, err) { const run = async () => { try { next(await this.get()); } catch (e) { err?.(e); } }; run(); return subscribe(table, run, id); },
     };
   },
   collection(table) {
-    return { onSnapshot(next, err) { const run = async () => { const { data, error } = await FR.SB.from(table).select("*").limit(5000); if (error) { err?.({ code: error.code, message: error.message }); return; } next({ docs: data.map(r => ({ id: r.id, data: () => table === "settings" ? r.data : fromRow(table, r) })), metadata: { fromCache: false } }); }; run(); return subscribe(table, run); } };
+    return { onSnapshot(next, err) { const run = async () => { const { data, error } = await live(FR.SB.from(table).select("*"), table).limit(5000); if (error) { err?.({ code: error.code, message: error.message }); return; } next({ docs: data.map(r => ({ id: r.id, data: () => table === "settings" ? r.data : fromRow(table, r) })), metadata: { fromCache: false } }); }; run(); return subscribe(table, run); } };
   },
 };
 let writing = false;
@@ -106,5 +112,5 @@ FR.callFunction = async (name, body) => {
 /* ---------- module registry ---------- */
 FR.modules = {};
 FR.registerModule = m => { FR.modules[m.id] = m; };
-FR.render = () => { const m = FR.modules[S.module]; if (S.view === "team") FR.renderTeam?.(); else m?.render?.(); };
+FR.render = () => { const m = FR.modules[S.module]; if (S.view === "team") FR.renderTeam?.(); else if (S.view === "deleted") FR.renderDeleted?.(); else m?.render?.(); };
 })();

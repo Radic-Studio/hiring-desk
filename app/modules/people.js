@@ -22,9 +22,9 @@ function scope() {
 }
 async function load(what = ["staff", "docs", "leave"]) {
   const jobs = [];
-  if (what.includes("staff")) jobs.push(SB().from("staff").select("*").order("full_name").then(({ data, error }) => { if (error) { notice("bad", "Could not load staff: " + error.message); return; } P.all.staff = data || []; }));
-  if (what.includes("docs")) jobs.push(SB().from("staff_documents").select("*").order("uploaded_at", { ascending: false }).then(({ data }) => { P.all.docs = data || []; }));
-  if (what.includes("leave")) jobs.push(SB().from("leave_requests").select("*").order("start_date", { ascending: false }).then(({ data }) => { P.all.leave = data || []; }));
+  if (what.includes("staff")) jobs.push(SB().from("staff").select("*").is("deleted_at", null).order("full_name").then(({ data, error }) => { if (error) { notice("bad", "Could not load staff: " + error.message); return; } P.all.staff = data || []; }));
+  if (what.includes("docs")) jobs.push(SB().from("staff_documents").select("*").is("deleted_at", null).order("uploaded_at", { ascending: false }).then(({ data }) => { P.all.docs = data || []; }));
+  if (what.includes("leave")) jobs.push(SB().from("leave_requests").select("*").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => { P.all.leave = data || []; }));
   await Promise.all(jobs); scope(); render();
   if (P.open && P.open !== "new" && !$("#drawer").classList.contains("open")) P.open = null;
   else if (P.open) paintDrawer();
@@ -185,9 +185,9 @@ function paintDetails(s, isNew, locked) {
     catch (err) { $("#pd-err").textContent = "Photo upload failed: " + (err.message || err); $("#pd-upload").disabled = false; $("#pd-upload").textContent = "Upload a photo"; }
   });
   $("#pd-del")?.addEventListener("click", async () => {
-    if (!confirm(`Delete ${s.full_name}'s record, with their documents and leave history? This cannot be undone. If they left the company, set Status to "Left" instead.`)) return;
-    const { error } = await SB().from("staff").delete().eq("id", s.id);
-    if (error) { toast(error.message, "bad"); return; } toast("Record deleted", "warn"); closeDrawer(); load();
+    if (!confirm(`Delete ${s.full_name}'s record, with their documents and leave history?\n\nA Group Admin can restore it from Recently deleted. If they left the company, set Status to "Left" instead.`)) return;
+    const r = await FR.softDelete("staff", s.id);
+    if (!r.ok) { toast(r.error, "bad"); return; } toast("Record deleted. A Group Admin can restore it.", "warn"); closeDrawer(); load();
   });
   $("#pd-save")?.addEventListener("click", async () => {
     const v = id => $("#" + id).value.trim();
@@ -242,10 +242,9 @@ function paintDocs(s, locked) {
     if (error) { toast("Could not open: " + error.message, "bad"); return; } window.open(data.signedUrl, "_blank", "noopener");
   });
   $("#pd-body").querySelectorAll("[data-ddel]").forEach(b => b.onclick = async () => {
-    const d = docs.find(x => x.id === b.dataset.ddel); if (!confirm(`Delete "${d.title}"?`)) return;
-    await SB().storage.from("staff-docs").remove([d.file_path]);
-    const { error } = await SB().from("staff_documents").delete().eq("id", d.id);
-    if (error) { toast(error.message, "bad"); return; } toast("Document deleted", "warn"); load(["docs"]);
+    const d = docs.find(x => x.id === b.dataset.ddel); if (!confirm(`Delete "${d.title}"? A Group Admin can restore it.`)) return;
+    const r = await FR.softDelete("staff_documents", d.id);   // the file stays in storage so a restore brings it back
+    if (!r.ok) { toast(r.error, "bad"); return; } toast("Document deleted", "warn"); load(["docs"]);
   });
 }
 function paintLeave(s, locked) {
