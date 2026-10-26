@@ -537,3 +537,19 @@ button.sync:hover{border-color:var(--line);background:var(--surface)}
 .bk-dot.ok{background:var(--ok-soft);color:var(--ok)} .bk-dot.warn{background:var(--warn-soft);color:var(--warn)} .bk-dot.bad{background:var(--bad-soft);color:var(--bad)}
 .st-note{font-size:13px;margin:6px 0;padding:8px 10px;border-radius:var(--r-s);background:var(--warn-soft);color:var(--fg)}
 .st-note.bad{background:var(--bad-soft)}
+
+/* conflict review (Stage 7) */
+.cf-card{border-left:3px solid var(--warn)}
+.cf-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+.cf-head small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.cf-table{width:100%;min-width:0;border-collapse:collapse;font-size:13px;margin:6px 0}
+.cf-table th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+.cf-table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.cf-table td:first-child{font-weight:600;white-space:nowrap}
+.cf-json{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;max-height:240px;overflow:auto;margin:6px 0 0}
+.cf-edit input,.cf-edit select,.cf-edit textarea{width:100%;padding:7px 9px;border:1px solid var(--line-2);border-radius:8px;font:inherit;font-size:13px;background:var(--surface)}
+.cf-use{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.cf-err{color:var(--bad);min-height:0}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600}
+@media (max-width:640px){.cf-table,.cf-table tbody{display:block;width:100%}.cf-table thead{display:none}.cf-table td:first-child{white-space:normal}.cf-table tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}.cf-table td{display:block;border:0;padding:3px 0}
+  .cf-table td:nth-child(2)::before{content:"Current: ";color:var(--muted);font-weight:400}.cf-table td:nth-child(3)::before{content:"Incoming: ";color:var(--muted);font-weight:400}}

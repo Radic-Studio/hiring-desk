@@ -19,19 +19,20 @@ function applyCompanyAccess() {
 
 /* ---------- navigation: companies × modules × views ---------- */
 const SHELL_VIEWS = { team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" },
-  deleted: { id: "deleted", title: "Recently deleted", sub: "Deleted records are kept here until a Group Admin restores them or removes them for good" } };
+  deleted: { id: "deleted", title: "Recently deleted", sub: "Deleted records are kept here until a Group Admin restores them or removes them for good" },
+  conflicts: { id: "conflicts", title: "Conflicts", sub: "Saves that clashed with someone else's change to the same field, waiting for a decision" } };
 // Hiring is a group-level function: only Group Admins (CEO, Directors, General Supervisor) see it, whichever company is selected.
 function companyModules(cid) { const c = S.companies.find(x => x.id === cid); return (c?.modules || ["hiring"]).filter(id => id !== "hiring" || isGroupAdmin()).map(id => FR.modules[id]).filter(Boolean); }
 function viewDef(v) { if (SHELL_VIEWS[v]) return SHELL_VIEWS[v]; for (const m of companyModules(S.company)) { const d = m.views.find(x => x.id === v); if (d) return { ...d, module: m.id }; } return null; }
 function buildNav() {
   const mods = companyModules(S.company);
   $("#tabs").innerHTML = mods.map(m => `<div class="nav-group">${mods.length > 1 ? `<div class="nav-head">${esc(m.name)}</div>` : ""}${m.views.map(v => `<button role="tab" data-view="${v.id}" title="${esc(v.nav || v.title)}">${v.icon || ""}<span class="lbl">${esc(v.nav || v.title)}</span>${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</button>`).join("")}</div>`).join("")
-    + (canManageTeam() || isGroupAdmin() ? `<div class="nav-group"><div class="nav-head">Group</div>${canManageTeam() ? `<button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button>` : ""}${isGroupAdmin() ? `<button role="tab" data-view="deleted" id="tab-deleted" title="Recently deleted"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="lbl">Recently deleted</span><span class="cnt" id="cnt-deleted" hidden>0</span></button>` : ""}</div>` : "");
+    + (canManageTeam() || isGroupAdmin() ? `<div class="nav-group"><div class="nav-head">Group</div>${canManageTeam() ? `<button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button>` : ""}${isGroupAdmin() ? `<button role="tab" data-view="deleted" id="tab-deleted" title="Recently deleted"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="lbl">Recently deleted</span><span class="cnt" id="cnt-deleted" hidden>0</span></button><button role="tab" data-view="conflicts" id="tab-conflicts" title="Conflicts"><svg viewBox="0 0 24 24"><path d="M7 4v10M7 14l-3-3M7 14l3-3M17 20V10M17 10l-3 3M17 10l3 3"/></svg><span class="lbl">Conflicts</span><span class="cnt" id="cnt-conflicts" hidden>0</span></button>` : ""}</div>` : "");
   // one section per view, created once
   const main = $("main");
   for (const m of Object.values(FR.modules)) for (const v of m.views) if (!$("#v-" + v.id)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v.id; s.hidden = true; main.appendChild(s); }
   for (const v of Object.keys(SHELL_VIEWS)) if (!$("#v-" + v)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v; s.hidden = true; main.appendChild(s); }
-  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintDeletedBadge();
+  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintDeletedBadge(); FR.paintConflictBadge?.();
 }
 function paintDeletedBadge() { const c = $("#cnt-deleted"); if (!c) return; const n = DEL.open.length; c.textContent = n; c.hidden = !n; }
 const CO_ICON = { press: "./app/brand/app_icon_press.svg", events: "./app/brand/app_icon_events.svg" };
@@ -73,7 +74,7 @@ function defaultCompany() {
   return (ok.find(c => c.id === saved) || ok.find(c => c.kind === "group") || ok[0] || {}).id || null;
 }
 function setView(v, opts = {}) {
-  if (v === "deleted" && !isGroupAdmin()) v = "dashboard";
+  if ((v === "deleted" || v === "conflicts") && !isGroupAdmin()) v = "dashboard";
   let d = viewDef(v); if (!d) { v = "dashboard"; d = viewDef(v); }
   if (!d) { v = "team"; d = SHELL_VIEWS.team; }
   S.view = v; S.module = d.module || null;
@@ -401,7 +402,7 @@ async function enter(session) {
   FR.statusStart?.();   // Live / Degraded / Offline and backup health
   FR.outboxStart?.();   // changes left on this device from an earlier session are sent now
   for (const m of Object.values(FR.modules)) m.start?.();
-  loadMembers(); if (isGroupAdmin()) loadDeleted();
+  loadMembers(); if (isGroupAdmin()) { loadDeleted(); FR.loadConflicts?.(); }
   FR.subscribe("companies", async () => { const { data } = await SB().from("companies").select("*").order("order"); if (data) { S.companies = data; buildNav(); if (S.view === "team") FR.render(); } });
   setView(r.view && viewDef(r.view) ? r.view : "dashboard");
   if (!access.profile_done) openProfile(true);

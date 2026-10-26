@@ -76,6 +76,7 @@ FR.softDelete = async (table, id) => { const { data, error } = await FR.SB.rpc("
  * `base` is the record version this screen was showing; if someone else changed the same field since,
  * the database keeps their value, files ours as a conflict for a Group Admin, and says so. */
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+FR.uuid = uuid;
 const isNetErr = e => !e?.code && /fetch|network|load failed|timeout|aborted/i.test(e?.message || "");
 /**
  * Save one record. FR.save(table, id or null, fields, { base, action, obj }) → { data: row, error, result }.
@@ -107,7 +108,7 @@ FR.save = async (table, id, fields, opt = {}) => {
     if (data.row && FR._rows[table]) FR._rows[table][String(data.row.id)] = data.row;
     return { data: data.row, result, error: null };
   }
-  if (result === "conflict") { if (data.row && FR._rows[table]) FR._rows[table][String(id)] = data.row; return { data: data.row, result, conflict: data, error: { code: "conflict", message: data.message } }; }
+  if (result === "conflict") { if (opt.obj && data.version != null) opt.obj.version = data.version; if (data.row && FR._rows[table]) FR._rows[table][String(id)] = data.row; return { data: data.row, result, conflict: data, error: { code: "conflict", message: data.message } }; }
   return { data: null, result: result || "refused", error: { code: /permission/i.test(data?.message || "") ? "42501" : "refused", message: data?.message || "Not saved" } };
 };
 FR._rows = {};   // last rows read per table, so the Hiring screens can send only what changed and the version they saw
@@ -176,5 +177,5 @@ FR.callFunction = async (name, body) => {
 /* ---------- module registry ---------- */
 FR.modules = {};
 FR.registerModule = m => { FR.modules[m.id] = m; };
-FR.render = () => { const m = FR.modules[S.module]; if (S.view === "team") FR.renderTeam?.(); else if (S.view === "deleted") FR.renderDeleted?.(); else m?.render?.(); };
+FR.render = () => { const m = FR.modules[S.module]; if (S.view === "team") FR.renderTeam?.(); else if (S.view === "deleted") FR.renderDeleted?.(); else if (S.view === "conflicts") FR.renderConflicts?.(); else m?.render?.(); };
 })();

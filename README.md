@@ -102,7 +102,25 @@ Every change to a business record goes through one database function, `apply_op(
 - **Logged.** Applied, duplicate, conflict and refused attempts all appear in `ops_log` with the operation id.
 - Helper functions live in the `fr_internal` schema, which the API does not expose, so nobody can call them to forge log or conflict rows.
 - Still written directly (by design): app settings, Press company settings, the customer name copied onto many jobs when a customer is renamed, files attached by customers in the portal, and the server functions (numbering, request to quote, portal request form). Customer messages in the portal use `apply_op`.
-- Resolving conflicts (Keep current / Take incoming / Edit and merge) is Stage 7; until then Group Admins can read open conflicts in the `conflicts` table.
+- When a save clashes on some fields, the fields that do not clash are still saved; only the clashing fields wait for review, and the person is told so.
+
+## Resolving conflicts (Group Admins)
+
+**Group → Conflicts** (with a count) lists every save that clashed. For each field it shows the current value, which is the one kept, and the incoming value that the other person tried to save. A Group Admin then chooses one of three options; staff private fields are covered below.
+
+- **Keep current:** nothing changes; the conflict is closed.
+- **Take incoming:** the other person's value is written (with a confirmation).
+- **Edit and merge:** type the value to keep for each field. "Use current" and "Use incoming" fill it in, and numbers, yes/no and lists get the right kind of box.
+
+The choice runs through `resolve_conflict` (migration `20261026_conflict_resolution.sql`):
+
+- Only Group Admins can resolve.
+- Values are written through `apply_op` (same permissions, version stamp and operation id).
+- If the record changed while the screen was open, nothing is written and the latest values are shown ("stale").
+- A repeated request returns "already resolved".
+- Every decision is logged in `ops_log` as action `resolve` with the choice, and the conflict keeps who resolved it, when and how.
+- **Private staff fields:** their values were never stored with conflicts, so Take incoming is switched off for them. Type the value or keep the current one.
+- **Deleted record:** restore it first, or Keep current.
 
 ## Status: Live / Degraded / Offline, and backup health
 
