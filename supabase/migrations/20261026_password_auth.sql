@@ -20,3 +20,15 @@ create policy leave_insert on public.leave_requests for insert to authenticated
 drop policy if exists leave_cancel_own on public.leave_requests;
 create policy leave_cancel_own on public.leave_requests for update to authenticated
   using (status = 'pending' and lower(requested_by) = public.my_email()) with check (status = 'cancelled');
+
+-- Hiring is a group-level function (CEO, Directors, General Supervisor = Group Admins). Only they can read or change hiring data,
+-- whichever company a role belongs to. The shell hides the Hiring module from everyone else.
+drop policy if exists roles_read on public.roles; drop policy if exists roles_write on public.roles;
+create policy roles_read on public.roles for select to authenticated using (public.is_admin());
+create policy roles_write on public.roles for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists candidates_read on public.candidates; drop policy if exists candidates_write on public.candidates;
+create policy candidates_read on public.candidates for select to authenticated using (public.is_admin());
+create policy candidates_write on public.candidates for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists issues_read on public.issues; drop policy if exists issues_write on public.issues;
+create policy issues_read on public.issues for select to authenticated using (public.is_admin());
+create policy issues_write on public.issues for all to authenticated using (public.is_admin()) with check (public.is_admin());

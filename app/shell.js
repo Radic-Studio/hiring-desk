@@ -19,17 +19,18 @@ function applyCompanyAccess() {
 
 /* ---------- navigation: companies × modules × views ---------- */
 const SHELL_VIEWS = { team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" } };
-function companyModules(cid) { const c = S.companies.find(x => x.id === cid); return (c?.modules || ["hiring"]).map(id => FR.modules[id]).filter(Boolean); }
+// Hiring is a group-level function: only Group Admins (CEO, Directors, General Supervisor) see it, whichever company is selected.
+function companyModules(cid) { const c = S.companies.find(x => x.id === cid); return (c?.modules || ["hiring"]).filter(id => id !== "hiring" || isGroupAdmin()).map(id => FR.modules[id]).filter(Boolean); }
 function viewDef(v) { if (SHELL_VIEWS[v]) return SHELL_VIEWS[v]; for (const m of companyModules(S.company)) { const d = m.views.find(x => x.id === v); if (d) return { ...d, module: m.id }; } return null; }
 function buildNav() {
   const mods = companyModules(S.company);
-  $("#tabs").innerHTML = mods.map(m => `<div class="nav-group">${mods.length > 1 ? `<div class="nav-head">${esc(m.name)}</div>` : ""}${m.views.map(v => `<button role="tab" data-view="${v.id}">${v.icon || ""}<span class="lbl">${esc(v.nav || v.title)}</span>${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</button>`).join("")}</div>`).join("")
-    + (canManageTeam() ? `<div class="nav-group"><div class="nav-head">Group</div><button role="tab" data-view="team" id="tab-team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button></div>` : "");
+  $("#tabs").innerHTML = mods.map(m => `<div class="nav-group">${mods.length > 1 ? `<div class="nav-head">${esc(m.name)}</div>` : ""}${m.views.map(v => `<button role="tab" data-view="${v.id}" title="${esc(v.nav || v.title)}">${v.icon || ""}<span class="lbl">${esc(v.nav || v.title)}</span>${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</button>`).join("")}</div>`).join("")
+    + (canManageTeam() ? `<div class="nav-group"><div class="nav-head">Group</div><button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button></div>` : "");
   // one section per view, created once
   const main = $("main");
   for (const m of Object.values(FR.modules)) for (const v of m.views) if (!$("#v-" + v.id)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v.id; s.hidden = true; main.appendChild(s); }
   if (!$("#v-team")) { const s = document.createElement("section"); s.className = "view"; s.id = "v-team"; s.hidden = true; main.appendChild(s); }
-  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintMobileNav();
+  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge();
 }
 const CO_ICON = { press: "./app/brand/app_icon_press.svg", events: "./app/brand/app_icon_events.svg" };
 function paintCompanyBadge() {
@@ -38,37 +39,23 @@ function paintCompanyBadge() {
   if (!c) { b.hidden = true; return; }
   b.hidden = false; b.innerHTML = `${CO_ICON[c.id] ? `<img src="${CO_ICON[c.id]}" alt="">` : ""}${esc(c.short_name)}`; b.title = c.name;
 }
-/* phones: five-item bottom bar (first four views of the active module + More), the rest in a sheet */
-function paintMobileNav() {
-  const btns = [...document.querySelectorAll("#tabs button[data-view]")]; btns.forEach(b => b.classList.remove("bn"));
-  const mod = companyModules(S.company).find(m => m.views.some(v => v.id === S.view)) || companyModules(S.company)[0];
-  const first = mod ? mod.views.slice(0, 4).map(v => v.id) : [];
-  btns.filter(b => first.includes(b.dataset.view)).forEach(b => b.classList.add("bn"));
-  let more = $("#tab-more");
-  if (!more) { more = document.createElement("button"); more.id = "tab-more"; more.setAttribute("role", "tab"); more.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span class="lbl">More</span>'; more.onclick = openMoreSheet; $("#tabs").appendChild(more); }
-  more.classList.add("bn"); more.setAttribute("aria-selected", "false");
-}
-function openMoreSheet() {
-  let sh = $("#more-sheet"); const hide = () => { $("#more-sheet")?.remove(); $("#scrim").classList.remove("open"); setTimeout(() => { if (!$("#drawer").classList.contains("open")) $("#scrim").hidden = true; }, 200); };
-  if (sh) { hide(); return; }
-  sh = document.createElement("div"); sh.className = "more-sheet"; sh.id = "more-sheet";
-  const comps = S.companies.filter(c => c.active && roleIn(c.id));
-  sh.innerHTML = `${comps.length > 1 ? `<div class="grp"><h4>Company</h4><select id="more-co">${comps.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>` : ""}
-    ${companyModules(S.company).map(m => `<div class="grp"><h4>${esc(m.name)}</h4>${m.views.map(v => `<button class="item" data-go="${v.id}" aria-selected="${v.id === S.view}">${v.icon || ""}<span>${esc(v.nav || v.title)}</span></button>`).join("")}</div>`).join("")}
-    ${canManageTeam() ? `<div class="grp"><h4>Group</h4><button class="item" data-go="team" aria-selected="${S.view === "team"}"><span>Team</span></button></div>` : ""}
-    <div class="grp"><h4>Account</h4><button class="item" id="more-profile"><span>${esc(S.me?.name || "")} · edit profile</span></button><button class="item" id="more-out"><span>Sign out</span></button></div>`;
-  document.body.appendChild(sh); $("#scrim").hidden = false; requestAnimationFrame(() => $("#scrim").classList.add("open")); $("#scrim").onclick = hide;
-  sh.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { hide(); setView(b.dataset.go); });
-  $("#more-co")?.addEventListener("change", e => { hide(); switchCompany(e.target.value); });
-  $("#more-profile").onclick = () => { hide(); openProfile(false); };
-  $("#more-out").onclick = async () => { await SB().auth.signOut(); location.reload(); };
+/* sidebar: collapsible rail on desktop, slide-in drawer on phones */
+const sideOpen = on => { document.body.classList.toggle("side-open", on); $("#side-scrim").hidden = !on; };
+function initSide() {
+  if (safeGet("fr_side") === "collapsed") document.body.classList.add("side-collapsed");
+  $("#side-toggle").onclick = () => { const on = document.body.classList.toggle("side-collapsed"); safeSet("fr_side", on ? "collapsed" : "open"); $("#side-toggle").title = $("#side-toggle").ariaLabel = on ? "Expand menu" : "Collapse menu"; };
+  $("#menu-btn").onclick = () => sideOpen(true);
+  $("#side-close").onclick = () => sideOpen(false);
+  $("#side-scrim").onclick = () => sideOpen(false);
 }
 function paintCompanySwitch() {
   const el = $("#company-switch"); if (!el) return;
   const list = S.companies.filter(c => c.active && roleIn(c.id));
   if (list.length <= 1) { el.innerHTML = `<div class="co-one"><b>${esc(FR.companyName(S.company) || "Future Ready")}</b></div>`; return; }
-  el.innerHTML = `<label class="co-label">Company</label><select id="company-sel" aria-label="Company">${list.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`;
+  const cur = list.find(c => c.id === S.company);
+  el.innerHTML = `<label class="co-label">Company</label><select id="company-sel" aria-label="Company">${list.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><button class="co-mini" id="co-mini" title="${esc(cur?.name || "")} · expand to switch">${esc((cur?.short_name || "FR").slice(0, 2).toUpperCase())}</button>`;
   $("#company-sel").onchange = e => switchCompany(e.target.value);
+  $("#co-mini").onclick = () => $("#side-toggle").click();
 }
 function switchCompany(cid, view) {
   if (!S.companies.some(c => c.id === cid && c.active) || !roleIn(cid)) cid = defaultCompany();
@@ -95,7 +82,7 @@ function setView(v, opts = {}) {
   $("#dl-btn").hidden = !(d.module && FR.modules[d.module]?.headerDownload);
   if (!/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", `#/${S.company}/${v}`); } catch {} }
   window.scrollTo({ top: 0, behavior: "smooth" });
-  paintMobileNav();
+  sideOpen(false);
   FR.render();
 }
 FR.setView = setView;
@@ -118,7 +105,7 @@ function togglePop(force) {
   const m = S.me, lab = roleLabel();
   const comps = S.companies.filter(c => c.active && roleIn(c.id));
   pop.innerHTML = `<h3>${esc(m?.name || "Guest")} <span class="role ${lab === "Viewer" ? "view" : m ? "edit" : ""}">${lab}</span></h3>
-    <p>${m?.email ? esc(m.email) + "<br>" : ""}${m?.position ? esc(m.position) + "<br>" : ""}Sign-in is with Google; there is no separate password.</p>
+    <p>${m?.email ? esc(m.email) + "<br>" : ""}${m?.position ? esc(m.position) + "<br>" : ""}Sign in with your email and password, or with Google. Change your password from Edit profile.</p>
     ${m ? `<ul>${isGroupAdmin() ? `<li>Group Admin: everything in every company</li>` : comps.map(c => `<li>${esc(c.name)}: ${ROLE_LABEL[roleIn(c.id)]}</li>`).join("") || "<li>No company access yet</li>"}</ul>` : ""}
     <div class="toolbar">${m ? `<button class="btn small" id="pop-profile">Edit profile</button><button class="btn small" id="pop-copy">Copy page link</button><button class="btn small" id="pop-out">Sign out</button>` : ``}<button class="btn small" id="pop-close">Close</button></div>`;
   pop.hidden = false; btn.setAttribute("aria-expanded", "true");
@@ -130,7 +117,6 @@ function togglePop(force) {
 FR.togglePop = togglePop;
 $("#me").addEventListener("click", () => togglePop());
 $("#act-btn").addEventListener("click", FR.openActivity);
-$("#me-mobile").addEventListener("click", () => { if (S.me) openProfile(false); else toast("Not signed in"); });
 document.addEventListener("click", e => { if (!e.target.closest(".foot") && !$("#pop").hidden) togglePop(false); });
 
 /* ---------- gate: sign-in, sign-up, pending, disabled ---------- */
@@ -360,7 +346,7 @@ function gateState(state, d = {}) {
 
 /* ---------- boot ---------- */
 async function boot() {
-  $("#foot-sheet").href = CFG.sheetUrl || "#";
+  $("#foot-sheet").href = CFG.sheetUrl || "#"; initSide();
   $$("#gate-seg button").forEach(b => b.onclick = () => gateMode(b.dataset.mode));
   gateMode("in");
   S.recovering = /type=recovery/.test(location.hash);
@@ -439,7 +425,7 @@ function openProfile(first) {
   const modal = $("#pf-modal"); $("#pf-scrim").hidden = false;
   const initials = ((v.first_name[0] || "") + (v.surname[0] || "")).toUpperCase() || "?";
   modal.innerHTML = `<h2 id="pf-title">${first ? "Complete your profile" : "Your profile"} <small class="muted" style="font-family:var(--body);font-weight:400;font-size:12px">${esc(m.email)}</small></h2>
-    ${first ? `<p class="muted" style="margin:0 0 12px">Colleagues see this on the Team page and next to the records you change. Details from your Google account are filled in; correct anything that is wrong.</p>` : ""}
+    ${first ? `<p class="muted" style="margin:0 0 12px">Colleagues see this on the Team page and next to the records you change. Anything we already know is filled in; correct what is wrong.</p>` : ""}
     <div class="pf-photo" style="margin-bottom:12px"><div class="avatar" id="pf-avatar">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="">` : esc(initials)}</div>
       <div><input type="file" id="pf-file" accept="image/png,image/jpeg,image/webp" hidden><button class="btn small" id="pf-upload">Upload a photo</button> ${g.avatar ? `<button class="btn small" id="pf-google">Use Google photo</button>` : ""}<p class="hint">JPG, PNG or WebP. It is resized to 256 px.</p></div></div>
     <div class="fields">
@@ -541,7 +527,7 @@ FR.renderTeam = function renderTeam() {
     <div class="team-grid">
       <div class="card"><h2>Invite someone <small>they get an email with a personal link</small></h2>
         <div class="fields">
-          <div class="field wide"><label>Google email address</label><input id="iv-email" type="email" placeholder="name@gmail.com" autocomplete="off"></div>
+          <div class="field wide"><label>Email address</label><input id="iv-email" type="email" placeholder="name@example.com" autocomplete="off"></div>
           <div class="field"><label>Name <span class="muted">(optional)</span></label><input id="iv-name" placeholder="Used in the email greeting"></div>
           <div class="field"><label>Company</label><select id="iv-company">${manageable.map(c => `<option value="${esc(c.id)}" ${c.id === cid ? "selected" : ""}>${esc(c.name)}</option>`).join("")}${ga ? `<option value="__group">Whole group (Group Admin)</option>` : ""}</select></div>
           <div class="field wide"><label>Role</label><select id="iv-role">${roleOpts("viewer", false)}</select><p class="hint" id="iv-help">${ROLE_HELP.viewer}</p></div>
@@ -550,7 +536,7 @@ FR.renderTeam = function renderTeam() {
         <div class="toolbar" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="iv-send">Send invitation</button></div></div>
       <div class="card"><h2>Access requests <small>${pending.length ? pending.length + " waiting" : "none waiting"}</small></h2>
         <div class="team-list">${pending.map(m => { const k = esc(m.email).replace(/[^a-z0-9]/gi, "_"); const rc = m.requested_company && manageable.some(c => c.id === m.requested_company) ? m.requested_company : (manageable[0] || {}).id; return `<div class="member">${avatarHtml(m)}<div style="min-width:0"><b>${esc(memberName(m))}</b><small>${esc(m.email)} · asked for ${ROLE_LABEL[m.requested_role] || "Viewer"}${m.requested_company ? " in " + esc(FR.companyName(m.requested_company)) : ""} · ${when(m.added_at)}</small></div>
-          <div class="acts"><select id="apc-${k}" aria-label="Company">${manageable.map(c => `<option value="${esc(c.id)}" ${c.id === rc ? "selected" : ""}>${esc(c.short_name)}</option>`).join("")}${ga ? `<option value="__group">Group Admin</option>` : ""}</select><select id="apr-${k}" aria-label="Role">${roleOpts(m.requested_role || "viewer", false)}</select><button class="btn small primary" data-approve="${esc(m.email)}">Approve</button><button class="btn small danger" data-remove="${esc(m.email)}">Decline</button></div></div>`; }).join("") || `<p class="muted">When someone signs in with Google without an invitation, their request appears here.</p>`}</div></div>
+          <div class="acts"><select id="apc-${k}" aria-label="Company">${manageable.map(c => `<option value="${esc(c.id)}" ${c.id === rc ? "selected" : ""}>${esc(c.short_name)}</option>`).join("")}${ga ? `<option value="__group">Group Admin</option>` : ""}</select><select id="apr-${k}" aria-label="Role">${roleOpts(m.requested_role || "viewer", false)}</select><button class="btn small primary" data-approve="${esc(m.email)}">Approve</button><button class="btn small danger" data-remove="${esc(m.email)}">Decline</button></div></div>`; }).join("") || `<p class="muted">When someone creates an account without an invitation, their request appears here.</p>`}</div></div>
     </div>
     ${invited.length ? `<div class="card"><h2>Invitations sent <small>not yet accepted</small></h2><div class="team-list">${invited.map(m => `<div class="member">${avatarHtml(m)}<div style="min-width:0"><b>${esc(memberName(m))}</b><small>${esc(m.email)} · ${m.level === "editor" ? "Group Admin" : S.companyMembers.filter(x => x.email.toLowerCase() === m.email.toLowerCase()).map(x => `${FR.companyShort(x.company_id)}: ${ROLE_LABEL[x.role]}`).join(", ") || "no role yet"} · invited ${when(m.invited_at || m.added_at)}${m.invite_sent_at ? "" : " · email not confirmed sent"}</small></div>
       <div class="acts"><button class="btn small" data-resend="${esc(m.email)}">Resend email</button>${ga ? `<button class="btn small danger" data-remove="${esc(m.email)}">Cancel</button>` : ""}</div></div>`).join("")}</div></div>` : ""}
