@@ -85,6 +85,7 @@ select concat_ws(E'\n\n',
   '-- who may call each function', (select t from fgrants),
   '-- triggers', (select t from trg),
   '-- row-level security', (select t from rls), (select t from pol),
+  '-- table rights the API never uses (stage9c)', 'revoke truncate, trigger, references on all tables in schema public from anon, authenticated;',
   '-- realtime', 'do $p$ begin if not exists (select 1 from pg_publication where pubname = ''supabase_realtime'') then create publication supabase_realtime; end if; end $p$;', (select t from pub),
   '-- storage buckets (files themselves are not in database backups)', (select t from bkt),
   'reset check_function_bodies;') as snapshot;

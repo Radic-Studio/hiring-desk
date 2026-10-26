@@ -102,6 +102,8 @@ FR.save = async (table, id, fields, opt = {}) => {
       return { data: null, result: "queued", queued: true, error: { code: "queued", message: FR.outbox.MSG } };
     return { data: null, result: "failed", error: { code: "unavailable", message: why || "No connection to the database. Nothing was saved." } };
   }
+  if (error && (error.code === "PGRST301" || /jwt expired|invalid jwt|jwt.*(malformed|signature)/i.test(error.message || "")))
+    return { data: null, result: "failed", error: { code: "session_expired", message: "Your sign-in has expired, so nothing was saved. Reload the page (sign in again if asked), then repeat the change." } };
   if (error) return { data: null, result: "failed", error: { code: error.code, message: error.message } };
   const result = data?.result;
   if (result === "applied" || result === "duplicate") {

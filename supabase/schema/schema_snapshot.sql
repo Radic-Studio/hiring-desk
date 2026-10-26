@@ -1,7 +1,6 @@
 -- Future Ready Group System: complete database schema snapshot (structure only: no data, no secrets).
 
--- Generated 2026-10-26 11:54 UTC from the live project by supabase/schema/generate_snapshot.sql.
--- Updated 2026-10-26 13:00 UTC: apply_op now ignores generated columns (stage9 migration); its body matches live (md5 fae3f88f).
+-- Generated 2026-10-26 14:18 UTC from the live project by supabase/schema/generate_snapshot.sql.
 
 -- Restore: run this whole file in the SQL editor of an EMPTY Supabase project, then load data with fr_restore() (see docs/RESTORE_RUNBOOK.md).
 
@@ -479,11 +478,6 @@ create table if not exists public.staff (
   end_date date,
   status public.staff_status not null,
   photo_url text default ''::text not null,
-  address text default ''::text not null,
-  date_of_birth date,
-  emergency_name text default ''::text not null,
-  emergency_phone text default ''::text not null,
-  notes text default ''::text not null,
   candidate_id text,
   history jsonb default '[]'::jsonb not null,
   created_at timestamp with time zone default now() not null,
@@ -515,6 +509,23 @@ create table if not exists public.staff_documents (
   op_id uuid default gen_random_uuid(),
   updated_at timestamp with time zone,
   updated_by text
+);
+create table if not exists public.staff_private (
+  id uuid not null,
+  company_id text not null,
+  address text default ''::text not null,
+  date_of_birth date,
+  emergency_name text default ''::text not null,
+  emergency_phone text default ''::text not null,
+  notes text default ''::text not null,
+  version integer default 1 not null,
+  op_id uuid default gen_random_uuid(),
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  updated_by text,
+  deleted_at timestamp with time zone,
+  deleted_by text,
+  delete_batch uuid
 );
 create table if not exists public.sync_runs (
   id uuid default gen_random_uuid() not null,
@@ -568,6 +579,7 @@ alter table public.roles add constraint roles_pkey PRIMARY KEY (id);
 alter table public.settings add constraint settings_pkey PRIMARY KEY (id);
 alter table public.staff add constraint staff_pkey PRIMARY KEY (id);
 alter table public.staff_documents add constraint staff_documents_pkey PRIMARY KEY (id);
+alter table public.staff_private add constraint staff_private_pkey PRIMARY KEY (id);
 alter table public.sync_runs add constraint sync_runs_pkey PRIMARY KEY (id);
 alter table public.customer_requests add constraint customer_requests_company_id_ref_key UNIQUE (company_id, ref);
 alter table public.press_jobs add constraint press_jobs_company_id_number_key UNIQUE (company_id, number);
@@ -613,6 +625,8 @@ alter table public.roles add constraint roles_company_id_fkey FOREIGN KEY (compa
 alter table public.staff add constraint staff_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id);
 alter table public.staff_documents add constraint staff_documents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id);
 alter table public.staff_documents add constraint staff_documents_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES public.staff(id) ON DELETE CASCADE;
+alter table public.staff_private add constraint staff_private_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id);
+alter table public.staff_private add constraint staff_private_id_fkey FOREIGN KEY (id) REFERENCES public.staff(id) ON DELETE CASCADE;
 
 -- indexes
 
@@ -620,6 +634,7 @@ CREATE INDEX candidates_delete_batch ON public.candidates USING btree (delete_ba
 CREATE INDEX candidates_phone_idx ON public.candidates USING btree (phone);
 CREATE INDEX candidates_role_idx ON public.candidates USING btree (role);
 CREATE INDEX conflicts_open ON public.conflicts USING btree (created_at DESC) WHERE (status = 'open'::text);
+CREATE UNIQUE INDEX customer_request_files_path_key ON public.customer_request_files USING btree (file_path);
 CREATE INDEX customer_request_files_req ON public.customer_request_files USING btree (request_id);
 CREATE INDEX customer_request_messages_req ON public.customer_request_messages USING btree (request_id, created_at);
 CREATE UNIQUE INDEX customer_requests_client_ref ON public.customer_requests USING btree (user_id, client_ref) WHERE (client_ref IS NOT NULL);
@@ -706,6 +721,7 @@ CREATE OR REPLACE FUNCTION fr_internal._op_mask(p_entity text, p jsonb)
 AS $function$
   select coalesce(jsonb_object_agg(key, case when key = any(case p_entity
       when 'staff' then array['phone','email','address','date_of_birth','emergency_name','emergency_phone','notes','photo_url']
+      when 'staff_private' then array['address','date_of_birth','emergency_name','emergency_phone','notes']
       when 'leave_requests' then array['reason','decision_note'] when 'staff_documents' then array['file_path','note'] else array[]::text[] end)
     then to_jsonb('[hidden]'::text) when key = 'history' then to_jsonb('[history]'::text) else value end), '{}'::jsonb)
   from jsonb_each(coalesce(p, '{}'::jsonb))
@@ -939,7 +955,7 @@ AS $function$
 declare
   me text := coalesce(public.my_email(), '');
   act text := lower(coalesce(p_action, ''));
-  allowed text[] := array['roles','candidates','issues','staff','staff_documents','leave_requests','press_customers','press_rate_items','press_jobs','press_payments','press_materials','press_files','customer_requests','press_material_moves','customer_request_messages'];
+  allowed text[] := array['roles','candidates','issues','staff','staff_private','staff_documents','leave_requests','press_customers','press_rate_items','press_jobs','press_payments','press_materials','press_files','customer_requests','press_material_moves','customer_request_messages'];
   insert_only text[] := array['press_material_moves','customer_request_messages'];
   protected text[] := array['id','version','op_id','deleted_at','deleted_by','delete_batch','created_at','created_by','updated_at','updated_by'];
   cols text[]; has_version boolean; patch jsonb; cur jsonb; newrow jsonb; rec public.op_receipts; sets text; collist text;
@@ -948,6 +964,10 @@ begin
   if me = '' then return jsonb_build_object('result', 'refused', 'message', 'Sign in first'); end if;
   if p_op_id is null then return jsonb_build_object('result', 'refused', 'message', 'Missing operation id'); end if;
   if not (p_entity = any(allowed)) then return jsonb_build_object('result', 'refused', 'message', 'This kind of record cannot be saved here'); end if;
+  -- private staff details live in staff_private since 26 Oct 2026; an older screen that still sends them is refused, never silently dropped
+  if p_entity = 'staff' and exists (select 1 from jsonb_each(coalesce(p_patch, '{}'::jsonb)) where key = any(array['address','date_of_birth','emergency_name','emergency_phone','notes']) and value not in ('null'::jsonb, '""'::jsonb)) then
+    return jsonb_build_object('result', 'refused', 'message', 'Private staff details are now saved separately. Reload the app and try again.');
+  end if;
   if act not in ('insert', 'update', 'save') or (p_entity = any(insert_only) and act <> 'insert') then
     return jsonb_build_object('result', 'refused', 'message', 'Unsupported action');
   end if;
@@ -1099,6 +1119,17 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.backup_last_success()
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select max(finished_at) from public.sync_runs
+   where status = 'success' and kind in ('rolling', 'nightly', 'monthly', 'manual') and public.my_level() is not null;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.can_manage_company(cid text)
  RETURNS boolean
  LANGUAGE sql
@@ -1132,6 +1163,26 @@ begin
   select company_id into new.company_id from public.roles where id = new.role;
   if new.company_id is null then new.company_id := 'group'; end if;
   return new;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.check_same_company()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare parent text := tg_argv[0]; fk text := tg_argv[1]; pid text := to_jsonb(new) ->> fk; pc text; also text[];
+begin
+  if pid is null then return new; end if;
+  if parent = 'staff' then
+    select s.company_id, s.companies into pc, also from public.staff s where s.id::text = pid;
+    if pc is null or new.company_id::text = pc or (tg_table_name = 'leave_requests' and new.company_id::text = any(also)) then return new; end if;
+  else
+    execute format('select company_id::text from public.%I where id::text = $1', parent) into pc using pid;
+    if pc is null or pc = new.company_id::text then return new; end if;
+  end if;
+  raise exception 'This record must belong to the same company as the % it points to', replace(parent, '_', ' ');
 end $function$
 ;
 
@@ -1171,6 +1222,20 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.leave_calendar(p_company text)
+ RETURNS TABLE(id uuid, staff_id uuid, staff_name text, start_date date, end_date date, days integer, status public.leave_status)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select l.id, l.staff_id, s.full_name, l.start_date, l.end_date, l.days, l.status
+    from public.leave_requests l join public.staff s on s.id = l.staff_id and s.deleted_at is null
+   where l.company_id = p_company and l.deleted_at is null and l.status = 'approved' and l.end_date >= current_date
+     and public.my_company_role(p_company) is not null
+   order by l.start_date;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.leave_decide(p_id uuid, p_status public.leave_status, p_note text DEFAULT ''::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1190,6 +1255,42 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.log_config()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare me text := coalesce(nullif(public.my_email(), ''), ''); nv jsonb; ov jsonb; k text; ch jsonb := '{}'::jsonb; rid text; cid text;
+  noise text[] := array['updated_at', 'last_seen_at'];
+  masked text[] := case tg_table_name when 'app_config' then array['value'] when 'member_invites' then array['token'] when 'members' then array['phone'] else array[]::text[] end;
+begin
+  nv := case when tg_op = 'DELETE' then null else to_jsonb(new) end;
+  ov := case when tg_op = 'INSERT' then null else to_jsonb(old) end;
+  for k in select jsonb_object_keys(coalesce(nv, ov)) loop
+    if k = any(noise) then continue; end if;
+    if tg_op = 'UPDATE' and (nv -> k) is not distinct from (ov -> k) then continue; end if;
+    if tg_op = 'DELETE' then continue; end if;
+    ch := ch || jsonb_build_object(k, case when k = any(masked) then to_jsonb('[changed]'::text)
+                                          when length((nv -> k)::text) > 2000 then to_jsonb('[large value]'::text) else nv -> k end);
+  end loop;
+  if tg_op = 'UPDATE' and ch = '{}'::jsonb then return null; end if;
+  rid := case tg_table_name
+    when 'members' then coalesce(nv, ov) ->> 'email'
+    when 'member_invites' then coalesce(nv, ov) ->> 'email'
+    when 'company_members' then (coalesce(nv, ov) ->> 'email') || ' @ ' || (coalesce(nv, ov) ->> 'company_id')
+    when 'company_settings' then (coalesce(nv, ov) ->> 'company_id') || ' / ' || (coalesce(nv, ov) ->> 'module')
+    when 'app_config' then coalesce(nv, ov) ->> 'key'
+    else coalesce(nv, ov) ->> 'id' end;
+  cid := case tg_table_name when 'companies' then coalesce(nv, ov) ->> 'id' else coalesce(nv, ov) ->> 'company_id' end;
+  insert into public.ops_log (op_id, entity, record_id, company_id, action, result, actor, actor_uid, source, changes)
+  values (coalesce(nullif(current_setting('fr.op_id', true), '')::uuid, gen_random_uuid()), tg_table_name, rid, cid, lower(tg_op), 'applied',
+          coalesce(nullif(me, ''), 'service'), auth.uid(),
+          case when me = '' then 'service' when current_setting('request.path', true) like '/rpc/%' then 'rpc' else 'direct' end, ch);
+  return null;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.log_op()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1200,6 +1301,7 @@ declare me text := coalesce(nullif(public.my_email(), ''), ''); act text; ch jso
   skip text[] := array['history', 'version', 'op_id', 'updated_at', 'updated_by', 'delete_batch'];
   secret text[] := case tg_table_name
     when 'staff' then array['phone', 'email', 'address', 'date_of_birth', 'emergency_name', 'emergency_phone', 'notes', 'photo_url']
+    when 'staff_private' then array['address', 'date_of_birth', 'emergency_name', 'emergency_phone', 'notes']
     when 'leave_requests' then array['reason', 'decision_note']
     when 'staff_documents' then array['file_path', 'note']
     else array[]::text[] end;
@@ -1228,7 +1330,11 @@ begin
   insert into public.ops_log (op_id, entity, record_id, company_id, action, result, base_version, result_version, actor, actor_uid, source, changes)
   values (case when tg_op = 'DELETE' then gen_random_uuid() else new.op_id end, tg_table_name, rid, cid, act, 'applied',
           case when tg_op = 'INSERT' then null else old.version end, case when tg_op = 'DELETE' then null else new.version end,
-          coalesce(nullif(me, ''), 'service'), auth.uid(), case when me = '' then 'service' else 'app' end, ch);
+          coalesce(nullif(me, ''), 'service'), auth.uid(),
+          case when me = '' then 'service'
+               when nullif(current_setting('fr.op_id', true), '') is not null then 'app'
+               when current_setting('request.path', true) like '/rpc/%' then 'rpc'
+               else 'direct' end, ch);
   return null;
 end $function$
 ;
@@ -1324,6 +1430,25 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.portal_attach_file(p_request uuid, p_name text, p_path text, p_size bigint, p_mime text)
+ RETURNS public.customer_request_files
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare r public.customer_request_files; co text;
+begin
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  select company_id into co from public.customer_requests where id = p_request and user_id = auth.uid();
+  if co is null then raise exception 'Request not found'; end if;
+  if split_part(p_path, '/', 2) <> auth.uid()::text or split_part(p_path, '/', 3) <> p_request::text then raise exception 'File path does not belong to this request'; end if;
+  insert into public.customer_request_files (request_id, company_id, name, file_path, size_bytes, mime, uploaded_by)
+  values (p_request, co, left(coalesce(p_name, 'file'), 200), p_path, p_size, left(coalesce(p_mime, ''), 120), auth.uid())
+  on conflict (file_path) do nothing returning * into r;
+  if r.id is null then select * into r from public.customer_request_files where file_path = p_path; end if;
+  return r;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.portal_public(p_company text)
  RETURNS jsonb
  LANGUAGE sql
@@ -1371,10 +1496,15 @@ end $function$
 CREATE OR REPLACE FUNCTION public.press_apply_move()
  RETURNS trigger
  LANGUAGE plpgsql
+ SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
+declare n int;
 begin
-  update public.press_materials set quantity = quantity + new.delta, updated_at = now(), updated_by = new.moved_by where id = new.material_id;
+  update public.press_materials set quantity = quantity + new.delta, updated_at = now(), updated_by = coalesce(new.moved_by, public.my_email())
+   where id = new.material_id and company_id = new.company_id and deleted_at is null;
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'This material is not available in this company'; end if;
   return new;
 end $function$
 ;
@@ -1402,7 +1532,7 @@ begin
   select * into d from public.deletions where id = p_batch;
   if d.id is null or d.restored_at is not null or d.purged_at is not null then raise exception 'Nothing to delete permanently'; end if;
   if trim(lower(coalesce(p_confirm, ''))) <> trim(lower(d.label)) then raise exception 'Type the name exactly to confirm'; end if;
-  foreach t in array array['issues','candidates','staff_documents','leave_requests','press_payments','press_files','roles','staff','press_jobs','press_customers','press_rate_items','press_materials','customer_requests'] loop
+  foreach t in array array['issues','candidates','staff_private','staff_documents','leave_requests','press_payments','press_files','roles','staff','press_jobs','press_customers','press_rate_items','press_materials','customer_requests'] loop
     execute format('delete from public.%I where delete_batch = $1', t) using p_batch;
   end loop;
   update public.deletions set purged_at = now(), purged_by = me where id = p_batch returning * into d;
@@ -1537,11 +1667,48 @@ begin
   elsif d.entity in ('press_payments', 'press_files') then execute format('select exists (select 1 from public.%I x join public.press_jobs j on j.id = x.job_id where x.id::text = $1 and j.deleted_at is not null)', d.entity) into parent_gone using d.record_id;
   end if;
   if parent_gone then raise exception 'Restore the record this belongs to first'; end if;
-  foreach t in array array['roles','candidates','issues','staff','staff_documents','leave_requests','press_customers','press_rate_items','press_jobs','press_payments','press_materials','press_files','customer_requests'] loop
+  foreach t in array array['roles','candidates','issues','staff','staff_private','staff_documents','leave_requests','press_customers','press_rate_items','press_jobs','press_payments','press_materials','press_files','customer_requests'] loop
     execute format('update public.%I set deleted_at = null, deleted_by = null, delete_batch = null where delete_batch = $1', t) using p_batch;
   end loop;
   update public.deletions set restored_at = now(), restored_by = me where id = p_batch returning * into d;
   return d;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.save_app_settings(p_id text, p_data jsonb)
+ RETURNS public.settings
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare r public.settings;
+begin
+  if coalesce(public.my_email(), '') = '' then raise exception 'Sign in first'; end if;
+  if p_id not in ('scoring', 'outreach', 'interviewEmail') then raise exception 'Unknown setting'; end if;
+  if jsonb_typeof(p_data) is distinct from 'object' then raise exception 'Settings must be an object'; end if;
+  insert into public.settings as s (id, data) values (p_id, p_data)
+  on conflict (id) do update set data = excluded.data
+  returning * into r;
+  return r;
+exception when insufficient_privilege then raise exception 'Only a Group Admin can change hiring settings' using errcode = '42501';
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.save_company_settings(p_company text, p_module text, p_data jsonb)
+ RETURNS public.company_settings
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare r public.company_settings;
+begin
+  if coalesce(public.my_email(), '') = '' then raise exception 'Sign in first'; end if;
+  if p_module not in ('press', 'portal') then raise exception 'Unknown settings area'; end if;
+  if jsonb_typeof(p_data) is distinct from 'object' then raise exception 'Settings must be an object'; end if;
+  insert into public.company_settings as s (company_id, module, data, updated_by, updated_at)
+  values (p_company, p_module, p_data, public.my_email(), now())
+  on conflict (company_id, module) do update set data = excluded.data, updated_by = excluded.updated_by, updated_at = excluded.updated_at
+  returning * into r;
+  return r;
+exception when insufficient_privilege then raise exception 'You do not have permission to change these settings' using errcode = '42501';
 end $function$
 ;
 
@@ -1592,6 +1759,7 @@ begin
   elsif p_entity = 'staff' then
     update public.staff_documents set deleted_at = now(), deleted_by = me, delete_batch = b where staff_id::text = p_id and deleted_at is null;
     get diagnostics n = row_count; if n > 0 then ch := ch || jsonb_build_object('staff_documents', n); end if;
+    update public.staff_private set deleted_at = now(), deleted_by = me, delete_batch = b where id::text = p_id and deleted_at is null;
     update public.leave_requests set deleted_at = now(), deleted_by = me, delete_batch = b where staff_id::text = p_id and deleted_at is null;
     get diagnostics n = row_count; if n > 0 then ch := ch || jsonb_build_object('leave_requests', n); end if;
   elsif p_entity = 'press_jobs' then
@@ -1616,6 +1784,19 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.staff_private_company()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  select s.company_id into new.company_id from public.staff s where s.id = new.id;
+  if new.company_id is null then raise exception 'No staff record for these private details'; end if;
+  return new;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.stamp_row()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1635,6 +1816,20 @@ begin
   elsif new.updated_by is not distinct from old.updated_by then new.updated_by := 'service';
   end if;
   return new;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.sync_job_customer_name()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.name is distinct from old.name then
+    update public.press_jobs set customer_name = new.name where customer_id = new.id and customer_name is distinct from new.name;
+  end if;
+  return null;
 end $function$
 ;
 
@@ -1711,15 +1906,19 @@ revoke all on function public.admin_set_company_role(text,text,public.company_ro
 revoke all on function public.admin_set_member(text,public.member_level,public.member_status) from public, anon, authenticated; grant execute on function public.admin_set_member(text,public.member_level,public.member_status) to authenticated; grant execute on function public.admin_set_member(text,public.member_level,public.member_status) to service_role;
 revoke all on function public.apply_op(uuid,text,text,text,jsonb,integer) from public, anon, authenticated; grant execute on function public.apply_op(uuid,text,text,text,jsonb,integer) to authenticated; grant execute on function public.apply_op(uuid,text,text,text,jsonb,integer) to service_role;
 revoke all on function public.backup_export() from public, anon, authenticated; grant execute on function public.backup_export() to service_role;
+revoke all on function public.backup_last_success() from public, anon, authenticated; grant execute on function public.backup_last_success() to authenticated; grant execute on function public.backup_last_success() to service_role;
 revoke all on function public.can_manage_company(text) from public, anon, authenticated; grant execute on function public.can_manage_company(text) to authenticated; grant execute on function public.can_manage_company(text) to service_role;
 revoke all on function public.can_write() from public, anon, authenticated; grant execute on function public.can_write() to authenticated; grant execute on function public.can_write() to anon; grant execute on function public.can_write() to service_role; grant execute on function public.can_write() to public;
 revoke all on function public.can_write_company(text) from public, anon, authenticated; grant execute on function public.can_write_company(text) to authenticated; grant execute on function public.can_write_company(text) to service_role;
 revoke all on function public.candidate_company() from public, anon, authenticated; grant execute on function public.candidate_company() to authenticated; grant execute on function public.candidate_company() to anon; grant execute on function public.candidate_company() to service_role; grant execute on function public.candidate_company() to public;
+revoke all on function public.check_same_company() from public, anon, authenticated; grant execute on function public.check_same_company() to service_role;
 revoke all on function public.is_admin() from public, anon, authenticated; grant execute on function public.is_admin() to authenticated; grant execute on function public.is_admin() to service_role;
 revoke all on function public.is_company_admin(text) from public, anon, authenticated; grant execute on function public.is_company_admin(text) to authenticated; grant execute on function public.is_company_admin(text) to service_role;
 revoke all on function public.is_editor() from public, anon, authenticated; grant execute on function public.is_editor() to authenticated; grant execute on function public.is_editor() to anon; grant execute on function public.is_editor() to service_role; grant execute on function public.is_editor() to public;
 revoke all on function public.issue_company() from public, anon, authenticated; grant execute on function public.issue_company() to authenticated; grant execute on function public.issue_company() to anon; grant execute on function public.issue_company() to service_role; grant execute on function public.issue_company() to public;
+revoke all on function public.leave_calendar(text) from public, anon, authenticated; grant execute on function public.leave_calendar(text) to authenticated; grant execute on function public.leave_calendar(text) to service_role;
 revoke all on function public.leave_decide(uuid,public.leave_status,text) from public, anon, authenticated; grant execute on function public.leave_decide(uuid,public.leave_status,text) to authenticated; grant execute on function public.leave_decide(uuid,public.leave_status,text) to service_role;
+revoke all on function public.log_config() from public, anon, authenticated; grant execute on function public.log_config() to service_role;
 revoke all on function public.log_op() from public, anon, authenticated; grant execute on function public.log_op() to service_role;
 revoke all on function public.my_access() from public, anon, authenticated; grant execute on function public.my_access() to authenticated; grant execute on function public.my_access() to service_role;
 revoke all on function public.my_company_role(text) from public, anon, authenticated; grant execute on function public.my_company_role(text) to authenticated; grant execute on function public.my_company_role(text) to service_role;
@@ -1727,47 +1926,69 @@ revoke all on function public.my_email() from public, anon, authenticated; grant
 revoke all on function public.my_level() from public, anon, authenticated; grant execute on function public.my_level() to authenticated; grant execute on function public.my_level() to service_role;
 revoke all on function public.my_member() from public, anon, authenticated; grant execute on function public.my_member() to authenticated; grant execute on function public.my_member() to service_role;
 revoke all on function public.next_number(text,text) from public, anon, authenticated; grant execute on function public.next_number(text,text) to authenticated; grant execute on function public.next_number(text,text) to service_role;
+revoke all on function public.portal_attach_file(uuid,text,text,bigint,text) from public, anon, authenticated; grant execute on function public.portal_attach_file(uuid,text,text,bigint,text) to authenticated; grant execute on function public.portal_attach_file(uuid,text,text,bigint,text) to service_role;
 revoke all on function public.portal_public(text) from public, anon, authenticated; grant execute on function public.portal_public(text) to authenticated; grant execute on function public.portal_public(text) to anon; grant execute on function public.portal_public(text) to service_role; grant execute on function public.portal_public(text) to public;
 revoke all on function public.portal_submit_request(text,text,text,text,text,date,text,text,text,uuid) from public, anon, authenticated; grant execute on function public.portal_submit_request(text,text,text,text,text,date,text,text,text,uuid) to authenticated; grant execute on function public.portal_submit_request(text,text,text,text,text,date,text,text,text,uuid) to service_role;
-revoke all on function public.press_apply_move() from public, anon, authenticated; grant execute on function public.press_apply_move() to authenticated; grant execute on function public.press_apply_move() to anon; grant execute on function public.press_apply_move() to service_role; grant execute on function public.press_apply_move() to public;
+revoke all on function public.press_apply_move() from public, anon, authenticated; grant execute on function public.press_apply_move() to service_role;
 revoke all on function public.public_companies() from public, anon, authenticated; grant execute on function public.public_companies() to authenticated; grant execute on function public.public_companies() to service_role;
 revoke all on function public.purge_deleted(uuid,text) from public, anon, authenticated; grant execute on function public.purge_deleted(uuid,text) to authenticated; grant execute on function public.purge_deleted(uuid,text) to service_role;
 revoke all on function public.request_access(public.member_level,text,text,public.company_role) from public, anon, authenticated; grant execute on function public.request_access(public.member_level,text,text,public.company_role) to authenticated; grant execute on function public.request_access(public.member_level,text,text,public.company_role) to service_role;
 revoke all on function public.request_to_quote(uuid) from public, anon, authenticated; grant execute on function public.request_to_quote(uuid) to authenticated; grant execute on function public.request_to_quote(uuid) to service_role;
 revoke all on function public.resolve_conflict(uuid,text,jsonb,integer,uuid) from public, anon, authenticated; grant execute on function public.resolve_conflict(uuid,text,jsonb,integer,uuid) to authenticated; grant execute on function public.resolve_conflict(uuid,text,jsonb,integer,uuid) to service_role;
 revoke all on function public.restore_deleted(uuid) from public, anon, authenticated; grant execute on function public.restore_deleted(uuid) to authenticated; grant execute on function public.restore_deleted(uuid) to service_role;
+revoke all on function public.save_app_settings(text,jsonb) from public, anon, authenticated; grant execute on function public.save_app_settings(text,jsonb) to authenticated; grant execute on function public.save_app_settings(text,jsonb) to service_role;
+revoke all on function public.save_company_settings(text,text,jsonb) from public, anon, authenticated; grant execute on function public.save_company_settings(text,text,jsonb) to authenticated; grant execute on function public.save_company_settings(text,text,jsonb) to service_role;
 revoke all on function public.soft_can_delete(text,text) from public, anon, authenticated; grant execute on function public.soft_can_delete(text,text) to service_role;
 revoke all on function public.soft_delete(text,text) from public, anon, authenticated; grant execute on function public.soft_delete(text,text) to authenticated; grant execute on function public.soft_delete(text,text) to service_role;
 revoke all on function public.soft_entity_ok(text) from public, anon, authenticated; grant execute on function public.soft_entity_ok(text) to service_role;
+revoke all on function public.staff_private_company() from public, anon, authenticated; grant execute on function public.staff_private_company() to service_role;
 revoke all on function public.stamp_row() from public, anon, authenticated; grant execute on function public.stamp_row() to authenticated; grant execute on function public.stamp_row() to anon; grant execute on function public.stamp_row() to service_role; grant execute on function public.stamp_row() to public;
+revoke all on function public.sync_job_customer_name() from public, anon, authenticated; grant execute on function public.sync_job_customer_name() to service_role;
 revoke all on function public.touch_row() from public, anon, authenticated; grant execute on function public.touch_row() to authenticated; grant execute on function public.touch_row() to anon; grant execute on function public.touch_row() to service_role; grant execute on function public.touch_row() to public;
 revoke all on function public.touch_updated_at() from public, anon, authenticated; grant execute on function public.touch_updated_at() to authenticated; grant execute on function public.touch_updated_at() to anon; grant execute on function public.touch_updated_at() to service_role; grant execute on function public.touch_updated_at() to public;
 revoke all on function public.update_my_profile(jsonb) from public, anon, authenticated; grant execute on function public.update_my_profile(jsonb) to authenticated; grant execute on function public.update_my_profile(jsonb) to service_role;
 
 -- triggers
 
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.app_config FOR EACH ROW EXECUTE FUNCTION public.log_config();
 CREATE TRIGGER candidates_company BEFORE INSERT OR UPDATE OF role ON public.candidates FOR EACH ROW EXECUTE FUNCTION public.candidate_company();
 CREATE TRIGGER candidates_touch BEFORE UPDATE ON public.candidates FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.candidates FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.candidates FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION public.log_config();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.company_members FOR EACH ROW EXECUTE FUNCTION public.log_config();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.company_settings FOR EACH ROW EXECUTE FUNCTION public.log_config();
+CREATE TRIGGER a_same_company_request BEFORE INSERT OR UPDATE OF request_id, company_id ON public.customer_request_files FOR EACH ROW EXECUTE FUNCTION public.check_same_company('customer_requests', 'request_id');
+CREATE TRIGGER a_same_company_request BEFORE INSERT OR UPDATE OF request_id, company_id ON public.customer_request_messages FOR EACH ROW EXECUTE FUNCTION public.check_same_company('customer_requests', 'request_id');
+CREATE TRIGGER a_same_company_customer BEFORE INSERT OR UPDATE OF customer_id, company_id ON public.customer_requests FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_customers', 'customer_id');
+CREATE TRIGGER a_same_company_job BEFORE INSERT OR UPDATE OF job_id, company_id ON public.customer_requests FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_jobs', 'job_id');
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.customer_requests FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.customer_requests FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
 CREATE TRIGGER issues_company BEFORE INSERT OR UPDATE OF candidate_id ON public.issues FOR EACH ROW EXECUTE FUNCTION public.issue_company();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.issues FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.issues FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_staff BEFORE INSERT OR UPDATE OF staff_id, company_id ON public.leave_requests FOR EACH ROW EXECUTE FUNCTION public.check_same_company('staff', 'staff_id');
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.leave_requests FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.leave_requests FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.member_invites FOR EACH ROW EXECUTE FUNCTION public.log_config();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.members FOR EACH ROW EXECUTE FUNCTION public.log_config();
 CREATE TRIGGER press_customers_touch BEFORE INSERT OR UPDATE ON public.press_customers FOR EACH ROW EXECUTE FUNCTION public.touch_row();
+CREATE TRIGGER sync_job_customer_name AFTER UPDATE OF name ON public.press_customers FOR EACH ROW EXECUTE FUNCTION public.sync_job_customer_name();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_customers FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_customers FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_job BEFORE INSERT OR UPDATE OF job_id, company_id ON public.press_files FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_jobs', 'job_id');
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_files FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_files FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_customer BEFORE INSERT OR UPDATE OF customer_id, company_id ON public.press_jobs FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_customers', 'customer_id');
 CREATE TRIGGER press_jobs_touch BEFORE INSERT OR UPDATE ON public.press_jobs FOR EACH ROW EXECUTE FUNCTION public.touch_row();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_jobs FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_jobs FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_job BEFORE INSERT OR UPDATE OF job_id, company_id ON public.press_material_moves FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_jobs', 'job_id');
+CREATE TRIGGER a_same_company_material BEFORE INSERT OR UPDATE OF material_id, company_id ON public.press_material_moves FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_materials', 'material_id');
 CREATE TRIGGER press_material_moves_apply AFTER INSERT ON public.press_material_moves FOR EACH ROW EXECUTE FUNCTION public.press_apply_move();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_materials FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_materials FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_job BEFORE INSERT OR UPDATE OF job_id, company_id ON public.press_payments FOR EACH ROW EXECUTE FUNCTION public.check_same_company('press_jobs', 'job_id');
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_payments FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_payments FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.press_rate_items FOR EACH ROW EXECUTE FUNCTION public.log_op();
@@ -1775,11 +1996,16 @@ CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.press_rate_items F
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.roles FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.roles FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
 CREATE TRIGGER settings_touch BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+CREATE TRIGGER zz_log_config AFTER INSERT OR DELETE OR UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION public.log_config();
 CREATE TRIGGER staff_touch BEFORE INSERT OR UPDATE ON public.staff FOR EACH ROW EXECUTE FUNCTION public.touch_row();
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.staff FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.staff FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER a_same_company_staff BEFORE INSERT OR UPDATE OF staff_id, company_id ON public.staff_documents FOR EACH ROW EXECUTE FUNCTION public.check_same_company('staff', 'staff_id');
 CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.staff_documents FOR EACH ROW EXECUTE FUNCTION public.log_op();
 CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.staff_documents FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
+CREATE TRIGGER staff_private_company BEFORE INSERT OR UPDATE ON public.staff_private FOR EACH ROW EXECUTE FUNCTION public.staff_private_company();
+CREATE TRIGGER zz_log_op AFTER INSERT OR DELETE OR UPDATE ON public.staff_private FOR EACH ROW EXECUTE FUNCTION public.log_op();
+CREATE TRIGGER zz_stamp_row BEFORE INSERT OR UPDATE ON public.staff_private FOR EACH ROW EXECUTE FUNCTION public.stamp_row();
 
 -- row-level security
 
@@ -1812,6 +2038,7 @@ alter table public.roles enable row level security;
 alter table public.settings enable row level security;
 alter table public.staff enable row level security;
 alter table public.staff_documents enable row level security;
+alter table public.staff_private enable row level security;
 alter table public.sync_runs enable row level security;
 
 create policy candidates_hide_deleted on public.candidates as RESTRICTIVE for SELECT to authenticated using (((deleted_at IS NULL) OR public.is_admin()));
@@ -1852,7 +2079,9 @@ create policy leave_cancel_own on public.leave_requests as PERMISSIVE for UPDATE
 create policy leave_insert on public.leave_requests as PERMISSIVE for INSERT to authenticated with check ((public.can_manage_company(company_id) OR (EXISTS ( SELECT 1
    FROM public.staff s
   WHERE ((s.id = leave_requests.staff_id) AND (lower(s.member_email) = public.my_email()))))));
-create policy leave_read on public.leave_requests as PERMISSIVE for SELECT to authenticated using ((public.my_company_role(company_id) IS NOT NULL));
+create policy leave_read on public.leave_requests as PERMISSIVE for SELECT to public using ((public.can_manage_company(company_id) OR (lower(requested_by) = public.my_email()) OR (EXISTS ( SELECT 1
+   FROM public.staff s
+  WHERE ((s.id = leave_requests.staff_id) AND (lower(s.member_email) = public.my_email()))))));
 create policy leave_requests_hide_deleted on public.leave_requests as RESTRICTIVE for SELECT to authenticated using (((deleted_at IS NULL) OR public.is_admin()));
 create policy leave_requests_no_hard_delete on public.leave_requests as RESTRICTIVE for DELETE to authenticated using (public.is_admin());
 create policy members_read on public.members as PERMISSIVE for SELECT to authenticated using ((public.my_level() IS NOT NULL));
@@ -1902,8 +2131,16 @@ create policy staff_read on public.staff as PERMISSIVE for SELECT to authenticat
 create policy staff_write on public.staff as PERMISSIVE for ALL to authenticated using (public.can_manage_company(company_id)) with check (public.can_manage_company(company_id));
 create policy staff_documents_hide_deleted on public.staff_documents as RESTRICTIVE for SELECT to authenticated using (((deleted_at IS NULL) OR public.is_admin()));
 create policy staff_documents_no_hard_delete on public.staff_documents as RESTRICTIVE for DELETE to authenticated using (public.is_admin());
-create policy staff_documents_read on public.staff_documents as PERMISSIVE for SELECT to authenticated using ((public.my_company_role(company_id) IS NOT NULL));
+create policy staff_documents_read on public.staff_documents as PERMISSIVE for SELECT to public using ((public.can_manage_company(company_id) OR (EXISTS ( SELECT 1
+   FROM public.staff s
+  WHERE ((s.id = staff_documents.staff_id) AND (lower(s.member_email) = public.my_email()))))));
 create policy staff_documents_write on public.staff_documents as PERMISSIVE for ALL to authenticated using (public.can_manage_company(company_id)) with check (public.can_manage_company(company_id));
+create policy staff_private_hide_deleted on public.staff_private as RESTRICTIVE for SELECT to public using (((deleted_at IS NULL) OR public.is_admin()));
+create policy staff_private_no_hard_delete on public.staff_private as RESTRICTIVE for DELETE to public using (public.is_admin());
+create policy staff_private_read on public.staff_private as PERMISSIVE for SELECT to public using ((public.can_manage_company(company_id) OR (EXISTS ( SELECT 1
+   FROM public.staff s
+  WHERE ((s.id = staff_private.id) AND (lower(s.member_email) = public.my_email()))))));
+create policy staff_private_write on public.staff_private as PERMISSIVE for ALL to public using (public.can_manage_company(company_id)) with check (public.can_manage_company(company_id));
 create policy sync_runs_admin_read on public.sync_runs as PERMISSIVE for SELECT to authenticated using (public.is_admin());
 create policy "avatars are public" on storage.objects as PERMISSIVE for SELECT to public using ((bucket_id = 'avatars'::text));
 create policy "customer files own read" on storage.objects as PERMISSIVE for SELECT to authenticated using (((bucket_id = 'customer-files'::text) AND ((storage.foldername(name))[2] = (auth.uid())::text)));
@@ -1916,11 +2153,17 @@ create policy "press files delete by staff" on storage.objects as PERMISSIVE for
 create policy "press files read by company" on storage.objects as PERMISSIVE for SELECT to authenticated using (((bucket_id = 'press-files'::text) AND (public.my_company_role((storage.foldername(name))[1]) IS NOT NULL)));
 create policy "press files write by staff" on storage.objects as PERMISSIVE for INSERT to authenticated with check (((bucket_id = 'press-files'::text) AND public.can_write_company((storage.foldername(name))[1])));
 create policy "staff docs delete by managers" on storage.objects as PERMISSIVE for DELETE to authenticated using (((bucket_id = 'staff-docs'::text) AND public.can_manage_company((storage.foldername(name))[1])));
-create policy "staff docs read by company" on storage.objects as PERMISSIVE for SELECT to authenticated using (((bucket_id = 'staff-docs'::text) AND (public.my_company_role((storage.foldername(name))[1]) IS NOT NULL)));
+create policy "staff docs read by managers or owner" on storage.objects as PERMISSIVE for SELECT to public using (((bucket_id = 'staff-docs'::text) AND (public.can_manage_company((storage.foldername(name))[1]) OR (EXISTS ( SELECT 1
+   FROM public.staff s
+  WHERE (((s.id)::text = (storage.foldername(objects.name))[2]) AND (lower(s.member_email) = public.my_email())))))));
 create policy "staff docs write by managers" on storage.objects as PERMISSIVE for INSERT to authenticated with check (((bucket_id = 'staff-docs'::text) AND public.can_manage_company((storage.foldername(name))[1])));
 create policy "staff photos by managers delete" on storage.objects as PERMISSIVE for DELETE to authenticated using (((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = 'staff'::text) AND public.can_manage_company((storage.foldername(name))[2])));
 create policy "staff photos by managers insert" on storage.objects as PERMISSIVE for INSERT to authenticated with check (((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = 'staff'::text) AND public.can_manage_company((storage.foldername(name))[2])));
 create policy "staff photos by managers update" on storage.objects as PERMISSIVE for UPDATE to authenticated using (((bucket_id = 'avatars'::text) AND ((storage.foldername(name))[1] = 'staff'::text) AND public.can_manage_company((storage.foldername(name))[2])));
+
+-- table rights the API never uses (stage9c)
+
+revoke truncate, trigger, references on all tables in schema public from anon, authenticated;
 
 -- realtime
 

@@ -22,7 +22,7 @@ create or replace function fr_internal.fr_restore(p_backup jsonb, p_confirm text
 returns jsonb language plpgsql set search_path = public, auth as $$
 declare
   order_list text[] := array['companies','members','company_members','company_settings','app_config','settings','counters',
-    'roles','candidates','issues','staff','staff_documents','leave_requests',
+    'roles','candidates','issues','staff','staff_private','staff_documents','leave_requests',
     'press_customers','press_rate_items','press_materials','press_jobs','press_payments','press_files','press_material_moves',
     'customer_requests','customer_request_messages','customer_request_files','portal_profiles',
     'member_invites','deletions','conflicts','op_receipts','ops_log','sync_runs'];
@@ -37,6 +37,18 @@ begin
   end loop;
   select array_agg(k) into extra from jsonb_object_keys(tabs) k where not (k = any(order_list));
   if extra is not null then raise exception 'The backup has tables this restore does not know: %. Update the schema and this function first.', extra; end if;
+  -- Backups taken before 26 Oct 2026 keep address, date of birth, emergency contact and notes on staff. Those now live in
+  -- staff_private (managers and the person only), so build its rows from the old staff rows.
+  if not (tabs ? 'staff_private') and tabs ? 'staff' then
+    tabs := tabs || jsonb_build_object('staff_private', coalesce((
+      select jsonb_agg(jsonb_build_object('id', r -> 'id', 'company_id', r -> 'company_id', 'address', r -> 'address',
+               'date_of_birth', r -> 'date_of_birth', 'emergency_name', r -> 'emergency_name', 'emergency_phone', r -> 'emergency_phone',
+               'notes', r -> 'notes', 'created_at', r -> 'created_at', 'updated_at', r -> 'updated_at', 'updated_by', r -> 'updated_by',
+               'deleted_at', r -> 'deleted_at', 'deleted_by', r -> 'deleted_by', 'delete_batch', r -> 'delete_batch'))
+      from jsonb_array_elements(tabs -> 'staff') r
+      where coalesce(nullif(r ->> 'address', ''), nullif(r ->> 'date_of_birth', ''), nullif(r ->> 'emergency_name', ''),
+                     nullif(r ->> 'emergency_phone', ''), nullif(r ->> 'notes', '')) is not null), '[]'::jsonb));
+  end if;
 
   -- 1. sign-in accounts (no passwords)
   insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, is_sso_user, is_anonymous)
