@@ -21,7 +21,10 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 | `supabase/migrations/*.sql` | The history of database changes, each already applied to the live project. A record, not a rebuild path: replaying them gives an older version of several security checks. |
 | `supabase/schema/schema_snapshot.sql` | The authoritative definition of the live database (tables, functions, access rules, triggers, storage buckets), generated from live by `generate_snapshot.sql`. Regenerate and commit it after every database change. |
 | `supabase/schema/restore_function.sql` | `fr_restore()`: loads a backup file into an empty project. Install only in the project being restored into. |
-| `docs/RESTORE_RUNBOOK.md` | Step-by-step rebuild of the database from a backup, tested 2026-10-26. |
+| `docs/RESTORE_RUNBOOK.md` | Step-by-step rebuild of the database from a backup. Full restore test passed 2026-10-26 (290/290 rows identical, every role checked). |
+| `docs/BACKEND_FREEZE.md` | What is frozen for the UI/UX redesign: architecture, data model, roles, save contract, offline rules, backups, files, sign-in, known low items. |
+| `docs/UI_UX_DATA_CONTRACT.md` | Per screen: what it reads, how it saves, which states it must show. |
+| `docs/contracts/*.json` | Machine-readable contracts: `enums.json`, `permissions.json`, `rpc.json`, `entities.schema.json`. |
 | `supabase/functions/send-doc/index.ts` | Edge function: emails a company document (quote, invoice, receipt) with a PDF attachment through the Gmail relay; caller must have write access to the company. |
 | `supabase/functions/invite-member/index.ts` | Edge function behind the Team page's Send invitation button: records the invitation (as the caller, so the database checks they are an Admin) and emails the personal link through the relay. Already deployed. |
 | `supabase/functions/send-email/index.ts` | Edge function that checks the sender and candidate, then relays the email to the Apps Script, which sends it from Gmail. Already deployed. |
@@ -41,7 +44,7 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 
 ## People
 
-`staff` (home company plus `companies[]` for people who also work elsewhere; `member_email` links a record to a login), `staff_documents` (metadata; files in the private `staff-docs` bucket under `<company>/<staff>/`), `leave_requests` (status pending → approved/declined through `leave_decide()`, which refuses deciding your own request). Admins and Managers of the home company edit; everyone with a role in the company reads; a linked member requests leave for themself.
+`staff` (home company plus `companies[]` for people who also work elsewhere; `member_email` links a record to a login), `staff_documents` (metadata; files in the private `staff-docs` bucket under `<company>/<staff>/`), `leave_requests` (status pending → approved/declined through `leave_decide()`, which refuses deciding your own request). Admins and Managers of the home company edit; a linked member requests leave for themself. Privacy (since 26 Oct 2026): everyone with a role in the company sees the directory (name, position, contact, photo, status) and the leave calendar (`leave_calendar()`: approved leave, names and dates only). Address, date of birth, emergency contact and notes live in `staff_private`; those, leave requests with reasons, and documents are visible only to company Admins/Managers, Group Admins and the person themself.
 
 ## Press
 
@@ -79,7 +82,7 @@ Recorded locations (fill in after setup; IDs are not secrets, keys are never wri
 | Drive folder ID | `1YeNyM7ZF-RHFmTgxB7zEv-YJlxk3vhPJ` (also in `app_config.backup_drive_folder_id`) |
 | Spreadsheet ID | `1No3W-7ucMWB76HpWdbZhcwuGrDPplsfL5tk51q2tNrs` (also in `app_config.backup_sheet_id`) |
 
-Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`BACKUP_FIXTURE=/path/to/backup.json node apps-script/tests/backup.test.js`; the fixture is any backup file or the output of `select public.backup_export()`, kept outside the repository because it holds personal data). Last run 2026-10-26 on the 12:58 UTC export: 16/16 pass.
+Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`BACKUP_FIXTURE=/path/to/backup.json node apps-script/tests/backup.test.js`; the fixture is any backup file or the output of `select public.backup_export()`, kept outside the repository because it holds personal data). Last run 2026-10-26 on the 14:21 UTC export: 18/18 pass (T17 checks row counts and destination in each run record, T18 that no private or secret table reaches the spreadsheet).
 
 **Restoring.** Follow `docs/RESTORE_RUNBOOK.md`. It rebuilds into a new, empty project and never touches live. Passwords and files are not in database backups: people sign in with Google or use Forgot password.
 
@@ -95,7 +98,7 @@ The Hiring Sheet script (`apps-script/Code.gs`) leaves deleted roles, candidates
 
 ## Versions and the operations log
 
-Every write to the 13 business tables is stamped by the database (`stamp_row` trigger): `version` is 1 on insert and goes up by one on every update, whatever the client sends; each write gets a fresh `op_id` (or the one a server function sets in `fr.op_id`, used from Stage 4); `updated_at` / `updated_by` are set (the signed-in person's confirmed email, or `service` for scripts and server functions). A second trigger (`log_op`) writes one row per write to `public.ops_log`: op_id, entity, record, company, action (insert, update, soft_delete, restore, delete), result, base and resulting version, actor, source, the changed fields and the time. Staff phone, email, address, birth date, emergency contacts, notes and photo, leave reasons and document paths are logged as `[set]` / `[changed]`, never their values; `history` columns and values over 2,000 characters are left out. Only Group Admins can read the log; nobody can edit or delete it through the API. The log is included in the backups.
+Every write to a business table is stamped by the database (`stamp_row` trigger): `version` is 1 on insert and goes up by one on every update, whatever the client sends; each write gets a fresh `op_id` (or the one a server function sets in `fr.op_id`, used from Stage 4); `updated_at` / `updated_by` are set (the signed-in person's confirmed email, or `service` for scripts and server functions). A second trigger (`log_op`) writes one row per write to `public.ops_log`: op_id, entity, record, company, action (insert, update, soft_delete, restore, delete), result, base and resulting version, actor, source, the changed fields and the time. Staff phone, email, address, birth date, emergency contacts, notes and photo, leave reasons and document paths are logged as `[set]` / `[changed]`, never their values; `history` columns and values over 2,000 characters are left out. Only Group Admins can read the log; nobody can edit or delete it through the API. The log is included in the backups.
 
 ## Saving: one safe write path
 
@@ -106,7 +109,7 @@ Every change to a business record goes through one database function, `apply_op(
 - **Same rules as before.** `apply_op` runs as the signed-in person, so row-level security decides who may write; refusals come back as plain messages and are logged. Deleted records cannot be edited until restored.
 - **Logged.** Applied, duplicate, conflict and refused attempts all appear in `ops_log` with the operation id.
 - Helper functions live in the `fr_internal` schema, which the API does not expose, so nobody can call them to forge log or conflict rows.
-- Still written directly (by design): app settings, Press company settings, the customer name copied onto many jobs when a customer is renamed, files attached by customers in the portal, and the server functions (numbering, request to quote, portal request form). Customer messages in the portal use `apply_op`.
+- Since Stage 9 nothing in the browser writes a table directly. Settings use `save_app_settings` / `save_company_settings`, customer file records use `portal_attach_file`, and the customer name on jobs is kept in step by a database trigger. Workflow steps (numbering, leave decisions, request to quote, portal request form, administration) are named functions. The full list is `docs/contracts/rpc.json`.
 - When a save clashes on some fields, the fields that do not clash are still saved; only the clashing fields wait for review, and the person is told so.
 
 ## Resolving conflicts (Group Admins)
