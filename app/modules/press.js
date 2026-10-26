@@ -18,23 +18,26 @@ const STAGE_LABEL = { quote: "Quote", accepted: "Accepted", design: "Design", pr
 const BOARD = ["quote", "accepted", "design", "proof", "print", "finishing", "ready"];
 const METHOD = { cash: "Cash", transfer: "Bank transfer", pos: "POS", other: "Other" };
 const FILE_KIND = { artwork: "Artwork", proof: "Proof", reference: "Reference", other: "Other" };
-const P = { all: { customers: [], rates: [], jobs: [], payments: [], materials: [], moves: [], files: [], settings: {} }, customers: [], rates: [], jobs: [], payments: [], materials: [], moves: [], files: [], cfg: {}, open: null, tab: "quote", q: "", stage: "", started: false, draft: null };
+const P = { all: { customers: [], rates: [], jobs: [], payments: [], materials: [], moves: [], files: [], requests: [], settings: {} }, customers: [], rates: [], jobs: [], payments: [], materials: [], moves: [], files: [], requests: [], cfg: {}, open: null, tab: "quote", q: "", stage: "", started: false, draft: null, reqOpen: null, reqFilter: "open" };
+const fmtD = d => d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "";
+const REQ_STATUS = { new: "New", quoted: "Quote sent", in_progress: "In progress", done: "Done", declined: "Declined" };
 const DEFAULT_CFG = () => ({ business_name: FR.companyName(S.company), address: "Udeorji Street, Obiagu, Enugu", phone: "", email: "", prefix: (FR.companyShort(S.company) || "FR").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "FRP", deposit_pct: 50, valid_days: 14, bank_name: "", account_name: "", account_number: "", terms: "Prices are valid for the period stated. Work starts when the deposit is received; the balance is due before delivery.", vat_pct: 0 });
 
 /* ---------- data ---------- */
 function scope() {
   const cid = S.company; const by = k => P.all[k].filter(x => x.company_id === cid);
-  P.customers = by("customers"); P.rates = by("rates").sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)); P.jobs = by("jobs"); P.payments = by("payments"); P.materials = by("materials").sort((a, b) => a.name.localeCompare(b.name)); P.moves = by("moves"); P.files = by("files");
+  P.customers = by("customers"); P.requests = by("requests").sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")); P.rates = by("rates").sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)); P.jobs = by("jobs"); P.payments = by("payments"); P.materials = by("materials").sort((a, b) => a.name.localeCompare(b.name)); P.moves = by("moves"); P.files = by("files");
   P.cfg = { ...DEFAULT_CFG(), ...(P.all.settings[cid] || {}) };
   if (P.open && P.open !== "new" && !P.jobs.find(j => j.id === P.open)) { P.open = null; closeDrawer(); }
 }
-async function load(what = ["customers", "rates", "jobs", "payments", "materials", "moves", "files", "settings"]) {
-  const T = { customers: "press_customers", rates: "press_rate_items", jobs: "press_jobs", payments: "press_payments", materials: "press_materials", moves: "press_material_moves", files: "press_files" };
+async function load(what = ["customers", "rates", "jobs", "payments", "materials", "moves", "files", "requests", "settings"]) {
+  const T = { customers: "press_customers", rates: "press_rate_items", jobs: "press_jobs", payments: "press_payments", materials: "press_materials", moves: "press_material_moves", files: "press_files", requests: "customer_requests" };
   await Promise.all(what.map(async k => {
     if (k === "settings") { const { data } = await SB().from("company_settings").select("company_id,data").eq("module", "press"); P.all.settings = {}; for (const r of data || []) P.all.settings[r.company_id] = r.data || {}; return; }
     const { data, error } = await SB().from(T[k]).select("*").limit(5000); if (error) { notice("bad", `Could not load ${k}: ${error.message}`); return; } P.all[k] = data || [];
   }));
   scope(); render(); if (P.open && $("#drawer").classList.contains("open")) paintDrawer();
+  if (P.reqOpen && $("#drawer").classList.contains("open")) openRequest(P.reqOpen, true);
 }
 const paidOf = j => P.payments.filter(p => p.job_id === j.id).reduce((s, p) => s + N(p.amount), 0);
 const balanceOf = j => Math.max(0, N(j.total) - paidOf(j));
@@ -48,10 +51,11 @@ const calcTotals = (items, discount, vat) => { const subtotal = items.reduce((s,
 function render() {
   if (!S.me) return;
   setCount("press-jobs", P.jobs.filter(j => !["delivered", "cancelled"].includes(j.stage)).length);
+  setCount("press-requests", P.requests.filter(r => r.status === "new").length);
   const low = P.materials.filter(m => N(m.quantity) <= N(m.reorder_level)).length; const c = $("#cnt-press-materials"); if (c) { c.textContent = low; c.hidden = !low; }
   const owed = P.jobs.filter(j => j.stage !== "quote" && j.stage !== "cancelled" && balanceOf(j) > 0).length; const m = $("#cnt-press-money"); if (m) { m.textContent = owed; m.hidden = !owed; }
   if (S.module !== "press") return;
-  ({ "press-jobs": renderJobs, "press-customers": renderCustomers, "press-materials": renderMaterials, "press-money": renderMoney, "press-rates": renderRates })[S.view]?.();
+  ({ "press-jobs": renderJobs, "press-requests": renderRequests, "press-customers": renderCustomers, "press-materials": renderMaterials, "press-money": renderMoney, "press-rates": renderRates })[S.view]?.();
 }
 function jobCard(j) {
   const bal = balanceOf(j);
@@ -80,6 +84,71 @@ function renderJobs() {
   $("#pj-new")?.addEventListener("click", () => openDrawer("new"));
   el.querySelectorAll("[data-open]").forEach(c => c.onclick = () => openDrawer(c.dataset.open));
   el.querySelectorAll(".tile[data-stage]").forEach(t => t.onclick = () => { P.q = ""; renderJobs(); });
+}
+/* ---------- customer requests (from the public portal) ---------- */
+function renderRequests() {
+  const el = $("#v-press-requests"); const f = P.reqFilter;
+  const list = P.requests.filter(r => f === "all" ? true : f === "open" ? ["new", "quoted", "in_progress"].includes(r.status) : r.status === f);
+  const link = `${location.origin}${location.pathname.replace(/[^/]*$/, "")}${S.company}/`;
+  el.innerHTML = `<div class="banner"><div><b>Customer link:</b> <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a></div><button class="btn small" id="rq-copy" style="margin-left:auto">Copy link</button></div>
+    <div class="toolbar"><div class="seg">${[["open", "Open"], ["new", "New"], ["quoted", "Quote sent"], ["in_progress", "In progress"], ["done", "Done"], ["declined", "Declined"], ["all", "All"]].map(([k, l]) => `<button aria-pressed="${f === k}" data-f="${k}">${l}</button>`).join("")}</div></div>
+    ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Customer</th><th>Request</th><th>Needed by</th><th>Received</th><th>Status</th><th></th></tr></thead><tbody>${list.map(r => `<tr><td class="mono">${esc(r.ref)}</td><td class="name">${esc(r.contact_name || r.contact_email)}<span class="sub">${esc(r.contact_phone || r.contact_email)}</span></td><td class="name">${esc(r.title)}${r.service ? `<span class="sub">${esc(r.service)}${r.quantity ? " · " + esc(r.quantity) : ""}</span>` : ""}</td><td>${r.needed_by ? fmtD(r.needed_by) : "—"}</td><td>${when(r.created_at)}</td><td><span class="pill ${r.status === "new" ? "info" : r.status === "quoted" ? "warn" : r.status === "done" ? "ok" : r.status === "declined" ? "bad" : ""} flat">${REQ_STATUS[r.status]}</span></td><td><button class="btn small" data-req="${r.id}">Open</button></td></tr>`).join("")}</tbody></table></div>
+    <div class="cards">${list.map(r => `<div class="ccard" data-req="${r.id}"><div class="row"><b>${esc(r.ref)} · ${esc(r.title)}</b><span class="pill flat">${REQ_STATUS[r.status]}</span></div><div class="muted">${esc(r.contact_name || r.contact_email)} · ${when(r.created_at)}</div></div>`).join("")}</div>`
+    : `<p class="muted">No requests here. Customers send them from the link above.</p>`}`;
+  $("#rq-copy").onclick = () => { navigator.clipboard?.writeText(link).then(() => toast("Link copied", "ok"), () => toast(link)); };
+  el.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { P.reqFilter = b.dataset.f; renderRequests(); });
+  el.querySelectorAll("[data-req]").forEach(b => b.onclick = () => openRequest(b.dataset.req));
+}
+async function openRequest(id, repaint) {
+  const r = P.requests.find(x => x.id === id); if (!r) return;
+  P.reqOpen = id; const ro = !canWrite(); const job = r.job_id ? P.jobs.find(j => j.id === r.job_id) : null;
+  $("#drawer").innerHTML = `<header><div><span class="pill flat">${REQ_STATUS[r.status]}</span><h2 style="margin-top:6px">${esc(r.title)}</h2><div class="muted" style="margin-top:4px">${esc(r.ref)} · ${when(r.created_at)}</div></div><button class="x" id="close" aria-label="Close">×</button></header>
+    <div class="body">
+      <div class="kv"><span>Customer</span><span><b>${esc(r.contact_name || "—")}</b><br>${esc(r.contact_phone || "")}${r.contact_phone ? ` · <a href="https://wa.me/${waNum(r.contact_phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<br><a href="mailto:${esc(r.contact_email)}">${esc(r.contact_email)}</a></span>
+        ${r.service ? `<span>Service</span><span>${esc(r.service)}</span>` : ""}${r.quantity ? `<span>Quantity</span><span>${esc(r.quantity)}</span>` : ""}${r.needed_by ? `<span>Needed by</span><span>${fmtD(r.needed_by)}</span>` : ""}
+        ${r.details ? `<span>Details</span><span style="white-space:pre-wrap">${esc(r.details)}</span>` : ""}
+        <span>Job</span><span>${job ? `<a href="#" id="rq-job">${esc(job.number)} · ${STAGE_LABEL[job.stage]}</a>` : "Not yet"}</span></div>
+      <h3 style="margin:14px 0 6px">Files</h3><ul class="files" id="rq-files"><li class="muted">Loading…</li></ul>
+      <h3 style="margin:14px 0 6px">Messages with the customer</h3><div class="msgs" id="rq-msgs"><p class="muted">Loading…</p></div>
+      ${ro ? "" : `<div class="field" style="margin-top:10px"><label>Reply <span class="muted">(the customer sees this on the portal)</span></label><textarea id="rq-text" rows="3"></textarea></div><div class="toolbar" style="justify-content:flex-end"><button class="btn small" id="rq-send">Send reply</button></div>
+      <div class="field" style="margin-top:10px"><label>Internal note <span class="muted">(staff only)</span></label><textarea id="rq-note" rows="2">${esc(r.staff_note || "")}</textarea></div>`}
+      <p class="hint" id="rq-err" style="color:var(--bad)"></p>
+    </div>
+    <footer>${ro ? "" : `${!job ? `<button class="btn primary small" id="rq-quote">Create quote from this</button>` : ""}<select id="rq-status" class="small">${Object.entries(REQ_STATUS).map(([k, l]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${l}</option>`).join("")}</select>`}<span style="flex:1"></span><button class="btn" id="rq-close">Close</button>${ro ? "" : `<button class="btn primary" id="rq-save">Save</button>`}</footer>`;
+  if (!repaint) showDrawer();
+  $("#close").onclick = closeDrawer; $("#rq-close").onclick = closeDrawer;
+  $("#rq-job")?.addEventListener("click", e => { e.preventDefault(); closeDrawer(); FR.setView("press-jobs"); openDrawer(job.id); });
+  $("#rq-quote")?.addEventListener("click", async () => {
+    const b = $("#rq-quote"); b.disabled = true; b.textContent = "Creating…";
+    const { data, error } = await SB().rpc("request_to_quote", { p_request: id });
+    if (error) { b.disabled = false; b.textContent = "Create quote from this"; $("#rq-err").textContent = error.message; return; }
+    logAct("Quote created from request " + r.ref, data?.number || "", "press");
+    await SB().from("customer_request_messages").insert({ request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: `We have received your request and are preparing your quote (${data?.number || ""}). We will send it shortly.` });
+    toast("Quote " + (data?.number || "") + " created", "ok"); await load(["requests", "jobs", "customers"]); closeDrawer(); FR.setView("press-jobs"); openDrawer(data.id);
+  });
+  $("#rq-send")?.addEventListener("click", async () => {
+    const t = $("#rq-text").value.trim(); if (!t) return; const b = $("#rq-send"); b.disabled = true;
+    const { error } = await SB().from("customer_request_messages").insert({ request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: t });
+    b.disabled = false; if (error) { $("#rq-err").textContent = error.message; return; }
+    $("#rq-text").value = ""; toast("Reply sent", "ok"); loadRequestThread(id);
+  });
+  $("#rq-save")?.addEventListener("click", async () => {
+    const body = { status: $("#rq-status").value, staff_note: $("#rq-note").value.trim(), updated_at: new Date().toISOString(), updated_by: me() };
+    const { error } = await SB().from("customer_requests").update(body).eq("id", id); if (error) { $("#rq-err").textContent = error.message; return; }
+    toast("Request saved", "ok"); closeDrawer(); load(["requests"]);
+  });
+  loadRequestThread(id);
+}
+async function loadRequestThread(id) {
+  const [{ data: files }, { data: msgs }] = await Promise.all([
+    SB().from("customer_request_files").select("*").eq("request_id", id).order("created_at"),
+    SB().from("customer_request_messages").select("*").eq("request_id", id).order("created_at"),
+  ]);
+  const fl = $("#rq-files"); if (fl) {
+    if (!files?.length) fl.innerHTML = `<li class="muted">No files attached.</li>`;
+    else { const rows = await Promise.all(files.map(async f => { const { data } = await SB().storage.from("customer-files").createSignedUrl(f.file_path, 3600); return `<li><a href="${esc(data?.signedUrl || "#")}" target="_blank" rel="noopener">${esc(f.name)}</a> <span class="muted">${f.size_bytes ? Math.round(f.size_bytes / 1024) + " KB" : ""}</span></li>`; })); fl.innerHTML = rows.join(""); }
+  }
+  const ml = $("#rq-msgs"); if (ml) ml.innerHTML = msgs?.length ? msgs.map(m => `<div class="msg ${m.author}">${esc(m.body)}<small>${esc(m.author === "staff" ? (m.author_name || "Staff") : (m.author_name || "Customer"))} · ${when(m.created_at)}</small></div>`).join("") : `<p class="muted">No messages yet.</p>`;
 }
 function renderCustomers() {
   const el = $("#v-press-customers"); const q = P.q.toLowerCase();
@@ -161,7 +230,7 @@ function renderRates() {
 
 /* ---------- job drawer ---------- */
 function showDrawer() { $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden", "false"); $("#scrim").hidden = false; requestAnimationFrame(() => $("#scrim").classList.add("open")); $("#scrim").onclick = closeDrawer; }
-function closeDrawer() { P.open = null; P.draft = null; $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("open"); setTimeout(() => { $("#scrim").hidden = true; }, 200); }
+function closeDrawer() { P.open = null; P.draft = null; P.reqOpen = null; $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("open"); setTimeout(() => { $("#scrim").hidden = true; }, 200); }
 function openDrawer(id) { P.open = id; P.tab = "quote"; P.draft = null; paintDrawer(); showDrawer(); }
 function jobOf() { return P.open === "new" ? null : P.jobs.find(j => j.id === P.open); }
 function paintDrawer() {
@@ -474,6 +543,7 @@ FR.registerModule({
   id: "press", name: "Press",
   views: [
     { id: "press-jobs", title: "Jobs", sub: "Quotes, production board and deliveries", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M12 16v4M7 8h10M7 12h6"/></svg>' },
+    { id: "press-requests", title: "Requests", sub: "What customers sent from the public link", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M4 4h16v12H7l-3 3z"/><path d="M8 9h8M8 12h5"/></svg>' },
     { id: "press-customers", title: "Customers", sub: "Who you print for, and what they owe", icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>' },
     { id: "press-materials", title: "Materials", sub: "Paper, ink and consumables in stock", count: true, icon: '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"/></svg>' },
     { id: "press-money", title: "Money", sub: "Outstanding balances, receipts and invoices", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/></svg>' },
@@ -481,9 +551,9 @@ FR.registerModule({
   ],
   start() {
     if (P.started) return; P.started = true; load();
-    [["press_customers", "customers"], ["press_rate_items", "rates"], ["press_jobs", "jobs"], ["press_payments", "payments"], ["press_materials", "materials"], ["press_material_moves", "moves"], ["press_files", "files"], ["company_settings", "settings"]].forEach(([t, k]) => FR.subscribe(t, () => load([k])));
+    [["press_customers", "customers"], ["press_rate_items", "rates"], ["press_jobs", "jobs"], ["press_payments", "payments"], ["press_materials", "materials"], ["press_material_moves", "moves"], ["press_files", "files"], ["customer_requests", "requests"], ["company_settings", "settings"]].forEach(([t, k]) => FR.subscribe(t, () => load([k])));
   },
-  onCompany() { P.q = ""; if (P.open) closeDrawer(); scope(); render(); },
+  onCompany() { P.q = ""; if (P.open || P.reqOpen) closeDrawer(); scope(); render(); },
   render, closeDrawer,
 });
 })();

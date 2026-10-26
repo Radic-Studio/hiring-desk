@@ -493,3 +493,11 @@ body[data-company="events"]{--co-accent:var(--co-events);--co-soft:var(--co-even
 @keyframes fade{from{opacity:0}to{opacity:1}}
 /* Netlify's free-plan badge is injected bottom-right; keep it out of the way of drawer and page buttons */
 #nl-badge-frame{right:auto!important;left:8px!important;bottom:8px!important;transform:scale(.8);transform-origin:left bottom}
+
+/* customer requests: files and message thread (shared look with the portal) */
+.files{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px}
+.files li{display:flex;justify-content:space-between;gap:8px;background:var(--surface-2);border-radius:8px;padding:6px 10px}
+.msgs{display:grid;gap:8px}
+.msg{max-width:88%;padding:9px 12px;border-radius:12px;background:var(--surface-2);font-size:14px;white-space:pre-wrap}
+.msg.staff{justify-self:end;background:var(--accent-soft)}
+.msg small{display:block;color:var(--muted);font-size:11px;margin-top:3px;white-space:normal}

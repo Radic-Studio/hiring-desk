@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Future Ready Press · Printing in Enugu</title>
+<meta name="description" content="Future Ready Press prints business cards, flyers, banners, programmes, invitations and souvenirs in Enugu. Request a quote online and follow your job.">
+<link rel="icon" type="image/svg+xml" href="../app/brand/app_icon_press.svg">
+<script src="../config.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="../app/portal.css?v=1">
+</head>
+<body data-company="press">
+<header class="top">
+  <a class="brand" href="./"><img src="../app/brand/lockup_horizontal_press.svg" alt="Future Ready Press" width="200" height="46"></a>
+  <nav class="links"><a href="#services">Services</a><a href="#how">How it works</a><a href="#contact">Contact</a></nav>
+  <div class="acct" id="acct"><a class="btn primary" href="#request" id="top-cta">Request a quote</a></div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-text">
+      <span class="eyebrow" id="hero-eyebrow">Future Ready Press · Enugu</span>
+      <h1 id="hero-title">Printing that makes your business look serious.</h1>
+      <p id="hero-about">Business cards, flyers, banners, programmes, invitations, souvenirs and packaging, with design help when you need it.</p>
+      <div class="cta"><a class="btn primary big" href="#request">Request a quote</a><a class="btn big" id="hero-wa" href="#contact" hidden>WhatsApp us</a></div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><div class="card c1"></div><div class="card c2"></div><div class="card c3"></div></div>
+  </section>
+
+  <section id="services" class="block">
+    <h2>What we print</h2>
+    <p class="muted">Pick one when you send a request, or describe something else; we quote most jobs the same day.</p>
+    <div class="services" id="services-list"></div>
+  </section>
+
+  <section id="how" class="block">
+    <h2>How it works</h2>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <section id="request" class="block request">
+    <div class="req-head"><h2 id="req-title">Request a quote</h2><p class="muted" id="req-sub">Create a free account so you can attach files and follow your job.</p></div>
+    <div id="req-body" class="req-body"></div>
+  </section>
+
+  <section id="contact" class="block contact">
+    <h2>Contact</h2>
+    <div class="contact-grid" id="contact-grid"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Future Ready Press · a company of Future Ready Nig. Ltd</span>
+  <span id="foot-addr">Udeorji Street, Obiagu, Enugu</span>
+  <a href="../">Staff sign-in</a>
+</footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" hidden></aside>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../app/portal.js?v=1"></script>
+</body>
+</html>

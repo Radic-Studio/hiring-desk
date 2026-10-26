@@ -34,14 +34,18 @@ Deno.serve(async (req) => {
   const d = hook.email_data, to = hook.user.email, site = (cfg.site_url || d.site_url || "").replace(/\/$/, "");
   const name = String(hook.user.user_metadata?.full_name || hook.user.user_metadata?.name || "").trim();
   const hi = `Good day${name ? " " + name : ""},`;
+  const portal = String(hook.user.user_metadata?.portal || "");   // set by the customer portal at sign-up ("press", "events")
+  const PORTAL_NAME: Record<string, string> = { press: "Future Ready Press", events: "Future Ready Events" };
+  const after = portal ? `After confirming, go back to the ${PORTAL_NAME[portal] || "Future Ready"} page, sign in and send your request.` : "After confirming, sign in and choose the company and access you need; an Admin then approves it.";
+  const product = portal ? (PORTAL_NAME[portal] || "Future Ready") : "the Future Ready Group System";
   const verify = (hash: string, type: string, redirect: string) => `${url}/auth/v1/verify?token=${encodeURIComponent(hash)}&type=${encodeURIComponent(type)}&redirect_to=${encodeURIComponent(redirect || site)}`;
   let subject = "", text = "", html = "";
   const t = d.email_action_type;
   if (t === "signup") {
     const link = verify(d.token_hash, "signup", d.redirect_to);
-    subject = "Confirm your email for the Future Ready Group System";
-    text = `${hi}\n\nConfirm this address to finish creating your account:\n${link}\n\nAfter confirming, sign in and choose the company and access you need; an Admin then approves it.\n\nIf you did not create this account, ignore this message.\n\nFuture Ready Nigeria Ltd`;
-    html = brandHtml("Confirm your email", `<p>${esc(hi)}</p><p>Confirm this address to finish creating your account.</p>${button(link, "Confirm email")}<p>After confirming, sign in and choose the company and access you need; an Admin then approves it.</p><p style="color:#63736D">If you did not create this account, ignore this message.</p>`, "Account confirmation");
+    subject = `Confirm your email for ${product}`;
+    text = `${hi}\n\nConfirm this address to finish creating your account:\n${link}\n\n${after}\n\nIf you did not create this account, ignore this message.\n\nFuture Ready Nigeria Ltd`;
+    html = brandHtml("Confirm your email", `<p>${esc(hi)}</p><p>Confirm this address to finish creating your account.</p>${button(link, "Confirm email")}<p>${esc(after)}</p><p style="color:#63736D">If you did not create this account, ignore this message.</p>`, "Account confirmation");
   } else if (t === "recovery") {
     const link = verify(d.token_hash, "recovery", d.redirect_to);
     subject = "Reset your Future Ready password";
