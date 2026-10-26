@@ -22,7 +22,7 @@ FR.safeSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const ACT = FR.ACT = []; let ACT_UNREAD = 0;
 function paintActBadge() { const b = $("#act-cnt"); if (!b) return; b.textContent = ACT_UNREAD; b.hidden = ACT_UNREAD === 0; }
 const logAct = FR.logAct = (kind, text, detail) => { ACT.unshift({ ts: new Date(), kind, text, detail: detail || "" }); if (ACT.length > 200) ACT.length = 200; ACT_UNREAD++; paintActBadge(); };
-const toast = FR.toast = (m, kind = "") => { const t = $("#toast"); t.textContent = m; t.className = "toast show " + kind; clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), kind === "bad" ? 4500 : 2600); if (kind) logAct(kind, m); };
+const toast = FR.toast = (m, kind = "") => { if (m === FR.QUEUED_MSG) kind = "warn"; const t = $("#toast"); t.textContent = m; t.className = "toast show " + kind; clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), kind === "bad" ? 4500 : 2600); if (kind) logAct(kind, m); };
 FR.openActivity = () => {
   const m = $("#act-modal");
   m.innerHTML = `<h2 id="act-title">Activity <small class="muted" style="font-family:var(--body);font-weight:400;font-size:12px">this session, newest first</small></h2>
@@ -88,11 +88,19 @@ FR.save = async (table, id, fields, opt = {}) => {
   const args = { p_op_id: op, p_entity: table, p_id: id == null ? null : String(id), p_action: action, p_patch: fields, p_base_version: base };
   let data, error;
   for (let attempt = 0; attempt < 3; attempt++) {
+    if (navigator.onLine === false) { error = { message: "network: offline" }; break; }   // the browser knows it is offline: no point waiting
     ({ data, error } = await FR.SB.rpc("apply_op", args));
     if (!error || !isNetErr(error)) break;
     await new Promise(r => setTimeout(r, 500 * (attempt + 1) + Math.random() * 300));   // same op id: safe to resend
   }
-  if (error) return { data: null, result: "failed", error: { code: isNetErr(error) ? "unavailable" : error.code, message: isNetErr(error) ? "No connection to the database. Nothing was saved." : error.message } };
+  if (error && isNetErr(error)) {
+    // Stage 5: keep it on this device for later, if this kind of change may wait. Never reported as "Saved".
+    const why = FR.outbox ? FR.outbox.refuse(table, action, fields) : "No connection to the database. Nothing was saved.";
+    if (!why && !opt.noQueue && await FR.outbox.queue({ op_id: op, table, id, action, fields, base, label: opt.label }))
+      return { data: null, result: "queued", queued: true, error: { code: "queued", message: FR.outbox.MSG } };
+    return { data: null, result: "failed", error: { code: "unavailable", message: why || "No connection to the database. Nothing was saved." } };
+  }
+  if (error) return { data: null, result: "failed", error: { code: error.code, message: error.message } };
   const result = data?.result;
   if (result === "applied" || result === "duplicate") {
     if (opt.obj && data.version != null) opt.obj.version = data.version;
@@ -150,6 +158,7 @@ FR.write = async (ref, body, okMsg) => {
   catch (e) {
     if (e?.code === "invalid_argument" && S.canWrite !== true) { S.canWrite = false; FR.paintRole(); FR.render(); toast("You have view-only access", "warn"); }
     else if (e?.code === "conflict") toast(e.message, "warn");
+    else if (e?.code === "queued") { toast(e.message, "warn"); return true; }   // kept on this device; deliberately not "Saved"
     else if (e?.code === "unavailable") toast("No connection to the database. Nothing was saved; try again.", "bad");   // FR.save already retried with the same operation id
     else toast("Could not save: " + (e?.message || e?.code || "unknown error"), "bad");
     return false;

@@ -12,6 +12,8 @@ const redirectTo = () => location.origin + location.pathname;
 const fmtDate = d => d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "";
 const when = d => d ? new Date(d).toLocaleString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
+/** A random id for "send once" references; works on older phones that lack crypto.randomUUID. */
+const newId = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
 function authErr(e) {
   const m = String(e?.message || e || "");
   if (/invalid login credentials/i.test(m)) return "Wrong email or password.";
@@ -150,8 +152,12 @@ async function submitRequest(e) {
   if (v("r-title").length < 3) return n.textContent = "Give the request a short title.";
   const files = [...$("#r-files").files]; const big = files.find(f => f.size > 25 * 1024 * 1024); if (big) return n.textContent = `${big.name} is over 25 MB.`;
   const b = $("#r-go"); busy(b, true);
-  const { data: r, error } = await sb.rpc("portal_submit_request", { p_company: CO, p_service: v("r-service"), p_title: v("r-title"), p_details: v("r-details"), p_quantity: v("r-qty"), p_needed_by: v("r-date") || null, p_name: v("r-name"), p_phone: v("r-phone"), p_business: v("r-biz") });
-  if (error) { busy(b, false, "Send request"); n.textContent = authErr(error); return; }
+  // one reference per filled-in form: pressing Send again (or a resend after a dropped connection) returns the same request
+  const form = $("#rf"); form.dataset.ref = form.dataset.ref || newId();
+  const args = { p_company: CO, p_service: v("r-service"), p_title: v("r-title"), p_details: v("r-details"), p_quantity: v("r-qty"), p_needed_by: v("r-date") || null, p_name: v("r-name"), p_phone: v("r-phone"), p_business: v("r-biz"), p_client_ref: form.dataset.ref };
+  let { data: r, error } = await sb.rpc("portal_submit_request", args);
+  if (error && !error.code) ({ data: r, error } = await sb.rpc("portal_submit_request", args));
+  if (error) { busy(b, false, "Send request"); n.textContent = error.code ? authErr(error) : "No connection. Your request was not sent; press Send again when you are back online."; return; }
   let failed = 0;
   for (const f of files) {
     const path = `${CO}/${me.id}/${r.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g, "_")}`;
@@ -159,7 +165,7 @@ async function submitRequest(e) {
     if (upErr) { failed++; continue; }
     await sb.from("customer_request_files").insert({ request_id: r.id, company_id: CO, name: f.name, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me.id });
   }
-  busy(b, false, "Send request"); $("#rf").reset();
+  busy(b, false, "Send request"); $("#rf").reset(); delete form.dataset.ref;
   toast(`Request ${r.ref} sent${failed ? ` (${failed} file${failed > 1 ? "s" : ""} failed to upload)` : ""}`);
   await loadReqs(); openReq(r.id);
 }
@@ -180,7 +186,7 @@ async function openReq(id) {
     <form class="pf" id="p-form"><div class="field"><textarea id="p-text" placeholder="Write to us about this request…"></textarea></div><div class="row"><span class="hint">We answer here and by email.</span><button class="btn primary small" id="p-send">Send</button></div></form>`;
   const close = () => { panel.hidden = scrim.hidden = true; panel.dataset.id = ""; };
   $(".x", panel).onclick = close; scrim.onclick = close;
-  $("#p-form").onsubmit = async e => { e.preventDefault(); const t = $("#p-text").value.trim(); if (!t) return; busy($("#p-send"), true); const args = { p_op_id: crypto.randomUUID(), p_entity: "customer_request_messages", p_id: null, p_action: "insert", p_patch: { request_id: id, company_id: CO, author: "customer", author_name: me.user_metadata?.full_name || me.email, body: t } };
+  $("#p-form").onsubmit = async e => { e.preventDefault(); const t = $("#p-text").value.trim(); if (!t) return; busy($("#p-send"), true); const args = { p_op_id: newId(), p_entity: "customer_request_messages", p_id: null, p_action: "insert", p_patch: { request_id: id, company_id: CO, author: "customer", author_name: me.user_metadata?.full_name || me.email, body: t } };
     let { data, error } = await sb.rpc("apply_op", args); if (error && !error.code) ({ data, error } = await sb.rpc("apply_op", args));   // one resend, same operation id: never a double message
     if (!error && data && !["applied", "duplicate"].includes(data.result)) error = { message: data.message || "Not sent" }; busy($("#p-send"), false, "Send"); if (error) return toast(authErr(error)); $("#p-text").value = ""; loadThread(id); };
   loadThread(id);

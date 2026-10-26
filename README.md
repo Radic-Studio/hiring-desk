@@ -104,6 +104,18 @@ Every change to a business record goes through one database function, `apply_op(
 - Still written directly (by design): app settings, Press company settings, the customer name copied onto many jobs when a customer is renamed, files attached by customers in the portal, and the server functions (numbering, request to quote, portal request form). Customer messages in the portal use `apply_op`.
 - Resolving conflicts (Keep current / Take incoming / Edit and merge) is Stage 7; until then Group Admins can read open conflicts in the `conflicts` table.
 
+## Working through a dropped connection (device outbox)
+
+If the database cannot be reached, a change that is safe to send later is kept in the browser (IndexedDB, `app/outbox.js`) with its operation id. The person sees **"Saved on this device. Waiting to synchronize."**, never "Saved", and a **Waiting to sync** button with a count appears in the top bar.
+
+- **Sent automatically** when the connection returns, when the tab is reopened, every 30 seconds while anything is waiting, and after signing in. Each change goes out with its original operation id and the version it was based on, so the normal duplicate and conflict rules apply. Only one tab sends a given change at a time.
+- **Never kept for later** (the person is told nothing was saved): payments; staff records, staff documents and leave (personal data stays off shared devices); deletions; cancelling a job or leave request.
+- **Outcome after sending:** accepted, so it leaves the device; clashed with someone else's edit, so it is filed as a conflict and the person is warned; refused (for example, access was removed), so it stays in the panel marked "Not accepted" with the reason, until the person discards it.
+- Changes belong to the person who made them: on a shared computer, one person's waiting changes are never sent or shown under another person's sign-in.
+- **Signing out** with changes still waiting first tries to send them; if some remain, the person is warned and they are removed from the device if they go ahead.
+- If the browser blocks storage (some private windows), nothing is kept and the person is told nothing was saved.
+- Customer portal: the request form sends a reference made once per form (`portal_submit_request(..., p_client_ref)`), so pressing Send twice or resending after a dropped connection returns the same request (migration `20261026_portal_request_once.sql`).
+
 ## Adding a module
 
 Create `app/modules/<id>.js`, call `FR.registerModule({ id, name, views: [{ id, title, sub, icon, count? }], start(), onCompany(), render() })`, add the script tag to `index.html` before `app/shell.js`, and list the module id in `companies.modules` for the companies that use it.

@@ -113,7 +113,7 @@ function togglePop(force) {
     <div class="toolbar">${m ? `<button class="btn small" id="pop-profile">Edit profile</button><button class="btn small" id="pop-copy">Copy page link</button><button class="btn small" id="pop-out">Sign out</button>` : ``}<button class="btn small" id="pop-close">Close</button></div>`;
   pop.hidden = false; btn.setAttribute("aria-expanded", "true");
   $("#pop-close").onclick = () => togglePop(false);
-  $("#pop-out")?.addEventListener("click", async () => { await SB().auth.signOut(); location.reload(); });
+  $("#pop-out")?.addEventListener("click", async () => { if (FR.outboxBeforeSignOut && !(await FR.outboxBeforeSignOut())) return; await SB().auth.signOut(); location.reload(); });
   $("#pop-profile")?.addEventListener("click", () => { togglePop(false); openProfile(false); });
   $("#pop-copy")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(location.href.split("#")[0]); toast("Link copied"); } catch { toast("Copy the link from your address bar"); } });
 }
@@ -398,6 +398,7 @@ async function enter(session) {
   $("#gate").hidden = true; gateShow.stop();
   FR.paintRole(); setSync(true, "live");
   logAct("ok", `Signed in as ${S.me.name} (${roleLabel()}, ${FR.companyName(S.company)})`);
+  FR.outboxStart?.();   // changes left on this device from an earlier session are sent now
   for (const m of Object.values(FR.modules)) m.start?.();
   loadMembers(); if (isGroupAdmin()) loadDeleted();
   FR.subscribe("companies", async () => { const { data } = await SB().from("companies").select("*").order("order"); if (data) { S.companies = data; buildNav(); if (S.view === "team") FR.render(); } });

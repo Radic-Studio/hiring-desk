@@ -501,3 +501,15 @@ body[data-company="events"]{--co-accent:var(--co-events);--co-soft:var(--co-even
 .msg{max-width:88%;padding:9px 12px;border-radius:12px;background:var(--surface-2);font-size:14px;white-space:pre-wrap}
 .msg.staff{justify-self:end;background:var(--accent-soft)}
 .msg small{display:block;color:var(--muted);font-size:11px;margin-top:3px;white-space:normal}
+
+/* device outbox (Stage 5) */
+#ob-btn{gap:6px;padding:6px 10px;font-size:12.5px;border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+#ob-btn .cnt{font-family:var(--mono);font-size:11px;background:var(--warn);color:#fff;border-radius:999px;padding:0 6px}
+#ob-btn.stuck{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+#ob-btn.stuck .cnt{background:var(--bad)}
+@media (max-width:640px){#ob-btn>span:not(.cnt){display:none}}
+.ob-list{display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:50vh;overflow:auto}
+.ob-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface)}
+.ob-row small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.ob-row.refused{border-color:var(--bad);background:var(--bad-soft)}
+.ob-row .bad{color:var(--bad)}
