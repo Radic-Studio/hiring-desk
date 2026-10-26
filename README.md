@@ -92,6 +92,18 @@ The Hiring Sheet script (`apps-script/Code.gs`) leaves deleted roles, candidates
 
 Every write to the 13 business tables is stamped by the database (`stamp_row` trigger): `version` is 1 on insert and goes up by one on every update, whatever the client sends; each write gets a fresh `op_id` (or the one a server function sets in `fr.op_id`, used from Stage 4); `updated_at` / `updated_by` are set (the signed-in person's confirmed email, or `service` for scripts and server functions). A second trigger (`log_op`) writes one row per write to `public.ops_log`: op_id, entity, record, company, action (insert, update, soft_delete, restore, delete), result, base and resulting version, actor, source, the changed fields and the time. Staff phone, email, address, birth date, emergency contacts, notes and photo, leave reasons and document paths are logged as `[set]` / `[changed]`, never their values; `history` columns and values over 2,000 characters are left out. Only Group Admins can read the log; nobody can edit or delete it through the API. The log is included in the backups.
 
+## Saving: one safe write path
+
+Every change to a business record goes through one database function, `apply_op(op_id, entity, id, action, fields, base_version)` (migration `20261026_apply_op.sql`). In the app it is `FR.save(table, id, fields, { obj })`; the Hiring screens reach it through `FR.dbShim`, which sends only the fields that changed.
+
+- **No double saves.** The app makes an operation id for each save and resends the same id if the connection drops (up to two retries). The database remembers every id in `op_receipts`; a repeat returns `duplicate` and changes nothing. A resent payment or message is never recorded twice.
+- **No silent overwrites.** The app sends the version it was showing. If someone else has since changed the same field to a different value, their value stays, the attempt is kept in `public.conflicts` (with both values; staff personal fields masked) and the person sees "Someone else changed … meanwhile". Changes to different fields merge. A person's own earlier saves never count as a conflict. `history` lists are merged, never shortened.
+- **Same rules as before.** `apply_op` runs as the signed-in person, so row-level security decides who may write; refusals come back as plain messages and are logged. Deleted records cannot be edited until restored.
+- **Logged.** Applied, duplicate, conflict and refused attempts all appear in `ops_log` with the operation id.
+- Helper functions live in the `fr_internal` schema, which the API does not expose, so nobody can call them to forge log or conflict rows.
+- Still written directly (by design): app settings, Press company settings, the customer name copied onto many jobs when a customer is renamed, files attached by customers in the portal, and the server functions (numbering, request to quote, portal request form). Customer messages in the portal use `apply_op`.
+- Resolving conflicts (Keep current / Take incoming / Edit and merge) is Stage 7; until then Group Admins can read open conflicts in the `conflicts` table.
+
 ## Adding a module
 
 Create `app/modules/<id>.js`, call `FR.registerModule({ id, name, views: [{ id, title, sub, icon, count? }], start(), onCompany(), render() })`, add the script tag to `index.html` before `app/shell.js`, and list the module id in `companies.modules` for the companies that use it.

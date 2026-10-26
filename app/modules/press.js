@@ -123,18 +123,18 @@ async function openRequest(id, repaint) {
     const { data, error } = await SB().rpc("request_to_quote", { p_request: id });
     if (error) { b.disabled = false; b.textContent = "Create quote from this"; $("#rq-err").textContent = error.message; return; }
     logAct("Quote created from request " + r.ref, data?.number || "", "press");
-    await SB().from("customer_request_messages").insert({ request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: `We have received your request and are preparing your quote (${data?.number || ""}). We will send it shortly.` });
+    await FR.save("customer_request_messages", null, { request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: `We have received your request and are preparing your quote (${data?.number || ""}). We will send it shortly.` });
     toast("Quote " + (data?.number || "") + " created", "ok"); await load(["requests", "jobs", "customers"]); closeDrawer(); FR.setView("press-jobs"); openDrawer(data.id);
   });
   $("#rq-send")?.addEventListener("click", async () => {
     const t = $("#rq-text").value.trim(); if (!t) return; const b = $("#rq-send"); b.disabled = true;
-    const { error } = await SB().from("customer_request_messages").insert({ request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: t });
+    const { error } = await FR.save("customer_request_messages", null, { request_id: id, company_id: S.company, author: "staff", author_name: S.me?.name || "", body: t });
     b.disabled = false; if (error) { $("#rq-err").textContent = error.message; return; }
     $("#rq-text").value = ""; toast("Reply sent", "ok"); loadRequestThread(id);
   });
   $("#rq-save")?.addEventListener("click", async () => {
-    const body = { status: $("#rq-status").value, staff_note: $("#rq-note").value.trim(), updated_at: new Date().toISOString(), updated_by: me() };
-    const { error } = await SB().from("customer_requests").update(body).eq("id", id); if (error) { $("#rq-err").textContent = error.message; return; }
+    const body = { status: $("#rq-status").value, staff_note: $("#rq-note").value.trim() };
+    const { error } = await FR.save("customer_requests", id, FR.diff(r, body), { obj: r }); if (error) { $("#rq-err").textContent = error.message; return; }
     toast("Request saved", "ok"); closeDrawer(); load(["requests"]);
   });
   loadRequestThread(id);
@@ -215,11 +215,11 @@ function renderRates() {
       ${isAdmin() ? `<div class="toolbar" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="cf-save">Save</button></div>` : `<p class="hint">Only a company Admin can change these.</p>`}</div></div>`;
   $("#rc-add")?.addEventListener("click", async () => {
     const name = $("#rc-name").value.trim(); if (!name) { toast("Enter the item name", "warn"); return; }
-    const { error } = await SB().from("press_rate_items").insert({ company_id: S.company, category: $("#rc-cat").value.trim() || "General", name, unit: $("#rc-unit").value.trim() || "piece", price: N($("#rc-price").value), order: 100 + P.rates.length, updated_by: me() });
+    const { error } = await FR.save("press_rate_items", null, { company_id: S.company, category: $("#rc-cat").value.trim() || "General", name, unit: $("#rc-unit").value.trim() || "piece", price: N($("#rc-price").value), order: 100 + P.rates.length });
     if (error) { toast(error.message, "bad"); return; } toast("Item added", "ok"); load(["rates"]);
   });
-  el.querySelectorAll("[data-price]").forEach(i => i.onchange = async () => { const { error } = await SB().from("press_rate_items").update({ price: N(i.value), updated_at: new Date().toISOString(), updated_by: me() }).eq("id", i.dataset.price); if (error) toast(error.message, "bad"); else toast("Price saved", "ok"); });
-  el.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => { const r = P.rates.find(x => x.id === b.dataset.toggle); await SB().from("press_rate_items").update({ active: !r.active }).eq("id", r.id); load(["rates"]); });
+  el.querySelectorAll("[data-price]").forEach(i => i.onchange = async () => { const { error } = await FR.save("press_rate_items", i.dataset.price, { price: N(i.value) }, { obj: P.rates.find(x => x.id === i.dataset.price) }); if (error) toast(error.message, "bad"); else toast("Price saved", "ok"); });
+  el.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => { const r = P.rates.find(x => x.id === b.dataset.toggle); const { error } = await FR.save("press_rate_items", r.id, { active: !r.active }, { obj: r }); if (error) toast(error.message, "bad"); load(["rates"]); });
   el.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this rate card item? A Group Admin can restore it.")) return; const r = await FR.softDelete("press_rate_items", b.dataset.del); if (!r.ok) toast(r.error, "bad"); else load(["rates"]); });
   $("#cf-save")?.addEventListener("click", async () => {
     const data = { business_name: $("#cf-name").value.trim(), address: $("#cf-addr").value.trim(), phone: $("#cf-phone").value.trim(), email: $("#cf-email").value.trim(), prefix: ($("#cf-prefix").value.trim().toUpperCase() || "FRP").replace(/[^A-Z0-9]/g, ""), deposit_pct: N($("#cf-dep").value), valid_days: N($("#cf-valid").value) || 14, vat_pct: N($("#cf-vat").value), bank_name: $("#cf-bank").value.trim(), account_name: $("#cf-acct").value.trim(), account_number: $("#cf-acno").value.trim(), terms: $("#cf-terms").value.trim() };
@@ -294,16 +294,16 @@ function paintQuote(j, isNew, ro) {
     $("#q-save").disabled = true;
     try {
       let cust = P.customers.find(c => c.name.toLowerCase() === d.customer_name.toLowerCase());
-      if (!cust) { const { data, error } = await SB().from("press_customers").insert({ company_id: S.company, name: d.customer_name }).select("*").maybeSingle(); if (error) throw error; cust = data; P.all.customers.push(cust); P.customers.push(cust); toast(`New customer: ${cust.name}`); }
+      if (!cust) { const { data, error } = await FR.save("press_customers", null, { company_id: S.company, name: d.customer_name }); if (error) throw error; cust = data; P.all.customers.push(cust); P.customers.push(cust); toast(`New customer: ${cust.name}`); }
       const tt = calcTotals(d.items, d.discount, P.cfg.vat_pct);
       const body = { company_id: S.company, customer_id: cust.id, customer_name: cust.name, title: d.title, description: d.description, items: d.items, subtotal: tt.subtotal, discount: d.discount, total: tt.total, deposit_pct: d.deposit_pct, valid_days: d.valid_days, due_date: d.due_date || null, specs: d.specs, notes: d.notes };
       if (isNew) {
         body.number = await nextNumber("Q"); body.stage = "quote"; body.quoted_at = new Date().toISOString(); body.history = [{ ts: body.quoted_at, by: me(), summary: "Quote created" }];
-        const { data, error } = await SB().from("press_jobs").insert(body).select("id").maybeSingle(); if (error) throw error;
+        const { data, error } = await FR.save("press_jobs", null, body); if (error) throw error;
         toast(`${body.number} created`, "ok"); logAct("ok", `Quote ${body.number} for ${cust.name}: ${money(tt.total)}`); P.open = data.id;
       } else {
         body.history = [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: `Quote edited · total ${money(tt.total)}` }].slice(-100);
-        const { error } = await SB().from("press_jobs").update(body).eq("id", j.id); if (error) throw error; toast("Saved", "ok");
+        const { error } = await FR.save("press_jobs", j.id, FR.diff(j, body), { obj: j }); if (error) throw error; toast("Saved", "ok");
       }
       P.draft = null; await load(["jobs", "customers"]); paintDrawer();
     } catch (e) { $("#q-err").textContent = e.message || String(e); $("#q-save").disabled = false; }
@@ -313,7 +313,7 @@ function paintQuote(j, isNew, ro) {
   $("#q-wa")?.addEventListener("click", () => { const c = custOf(j); const txt = `Good day ${c?.name || ""}, here is your quote ${j.number} from ${P.cfg.business_name}:\n${(j.items || []).map(i => `• ${i.description} × ${N(i.qty)} = ${money(i.total)}`).join("\n")}\nTotal: ${money(j.total)}${N(j.deposit_pct) ? ` (deposit ${N(j.deposit_pct)}% = ${money(N(j.total) * N(j.deposit_pct) / 100)})` : ""}\nValid for ${N(j.valid_days)} days. Reply to confirm and we start.`; savePdf(quotePdf(j), `${j.number}.pdf`); window.open(`https://wa.me/${waNum(c?.phone)}?text=${encodeURIComponent(txt)}`, "_blank", "noopener"); toast("Quote PDF downloaded: attach it in WhatsApp if you like"); markSent(j); });
 }
 const waNum = p => { const d = String(p || "").replace(/\D/g, ""); return d.startsWith("0") ? "234" + d.slice(1) : d; };
-async function markSent(j) { if (j.sent_at) return; await SB().from("press_jobs").update({ sent_at: new Date().toISOString(), history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: "Quote sent to customer" }] }).eq("id", j.id); load(["jobs"]); }
+async function markSent(j) { if (j.sent_at) return; await FR.save("press_jobs", j.id, { sent_at: new Date().toISOString(), history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: "Quote sent to customer" }] }, { obj: j }); load(["jobs"]); }
 function paintJob(j, isNew, ro) {
   const idx = STAGES.indexOf(j.stage); const next = BOARD[BOARD.indexOf(j.stage) + 1];
   const staff = (FR.modules.people ? [] : []);
@@ -339,12 +339,12 @@ function paintJob(j, isNew, ro) {
   if (!ro && j.stage === "delivered" && canManage()) btns.push(`<button class="btn" data-stage="ready">Reopen</button>`);
   $("#pj-foot").innerHTML = `${btns.join("")}<span style="flex:1"></span><button class="btn" id="jb-close">Close</button>${ro ? "" : `<button class="btn" id="jb-save">Save</button>`}`;
   $("#jb-close").onclick = closeDrawer;
-  $("#jb-save")?.addEventListener("click", async () => { const { error } = await SB().from("press_jobs").update({ due_date: $("#jb-due").value || null, assigned_to: $("#jb-assign").value.trim(), notes: $("#jb-notes").value.trim() }).eq("id", j.id); if (error) toast(error.message, "bad"); else { toast("Saved", "ok"); load(["jobs"]); } });
+  $("#jb-save")?.addEventListener("click", async () => { const { error } = await FR.save("press_jobs", j.id, FR.diff(j, { due_date: $("#jb-due").value || null, assigned_to: $("#jb-assign").value.trim(), notes: $("#jb-notes").value.trim() }), { obj: j }); if (error) toast(error.message, "bad"); else { toast("Saved", "ok"); load(["jobs"]); } });
   $("#pj-foot").querySelectorAll("[data-stage]").forEach(b => b.onclick = () => setStage(j, b.dataset.stage));
-  $("#jb-proof")?.addEventListener("click", async () => { await SB().from("press_jobs").update({ proof_approved_at: new Date().toISOString(), history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: "Proof approved by customer" }] }).eq("id", j.id); toast("Proof approved", "ok"); load(["jobs"]); });
+  $("#jb-proof")?.addEventListener("click", async () => { const { error } = await FR.save("press_jobs", j.id, { proof_approved_at: new Date().toISOString(), history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: "Proof approved by customer" }] }, { obj: j }); if (error) { toast(error.message, "bad"); return; } toast("Proof approved", "ok"); load(["jobs"]); });
   $("#jb-use")?.addEventListener("click", async () => {
     const mid = $("#jb-mat").value, qty = N($("#jb-qty").value); if (!mid || qty <= 0) { toast("Choose a material and quantity", "warn"); return; }
-    const { error } = await SB().from("press_material_moves").insert({ company_id: S.company, material_id: mid, job_id: j.id, delta: -qty, note: "Used on " + j.number, moved_by: me() });
+    const { error } = await FR.save("press_material_moves", null, { company_id: S.company, material_id: mid, job_id: j.id, delta: -qty, note: "Used on " + j.number, moved_by: me() });
     if (error) { toast(error.message, "bad"); return; } toast("Stock updated", "ok"); load(["materials", "moves"]);
   });
 }
@@ -352,7 +352,7 @@ async function setStage(j, stage) {
   if (stage === "cancelled" && !confirm(`Cancel ${j.number}? Payments already recorded stay on file.`)) return;
   const now = new Date().toISOString(); const patch = { stage, history: [...(j.history || []), { ts: now, by: me(), summary: `Stage: ${STAGE_LABEL[stage]}` }].slice(-100) };
   if (stage === "accepted") patch.accepted_at = now; if (stage === "delivered") patch.delivered_at = now;
-  const { error } = await SB().from("press_jobs").update(patch).eq("id", j.id);
+  const { error } = await FR.save("press_jobs", j.id, patch, { obj: j });
   if (error) { toast(error.message, "bad"); return; }
   toast(`${j.number}: ${STAGE_LABEL[stage]}`, "ok"); logAct("ok", `${j.number} moved to ${STAGE_LABEL[stage]}`); await load(["jobs"]);
   if (stage === "accepted" && balanceOf(j) > 0) { P.tab = "pay"; paintDrawer(); }
@@ -374,8 +374,8 @@ function paintPay(j, isNew, ro) {
     $("#py-go").disabled = true;
     try {
       const receipt_no = await nextNumber("R");
-      const { data, error } = await SB().from("press_payments").insert({ company_id: S.company, job_id: j.id, receipt_no, amount, method: $("#py-method").value, paid_at: $("#py-date").value || today(), note: $("#py-note").value.trim(), received_by: me() }).select("*").maybeSingle(); if (error) throw error;
-      await SB().from("press_jobs").update({ history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: `Payment ${money(amount)} (${METHOD[data.method]}) · receipt ${receipt_no}` }].slice(-100) }).eq("id", j.id);
+      const { data, error } = await FR.save("press_payments", null, { company_id: S.company, job_id: j.id, receipt_no, amount, method: $("#py-method").value, paid_at: $("#py-date").value || today(), note: $("#py-note").value.trim(), received_by: me() }); if (error) throw error;
+      await FR.save("press_jobs", j.id, { history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: `Payment ${money(amount)} (${METHOD[data.method]}) · receipt ${receipt_no}` }] }, { obj: j });
       toast(`Receipt ${receipt_no} saved`, "ok"); logAct("ok", `${j.number}: ${money(amount)} received, receipt ${receipt_no}`);
       await load(["payments", "jobs"]); savePdf(receiptPdf(jobOf() || j, data), `${receipt_no}.pdf`);
     } catch (e) { $("#py-err").textContent = e.message || String(e); $("#py-go").disabled = false; }
@@ -394,7 +394,7 @@ function paintFiles(j, isNew, ro) {
     $("#pf-up").disabled = true; const path = `${S.company}/${j.id}/${Date.now().toString(36)}-${f.name.replace(/[^A-Za-z0-9._-]+/g, "-")}`;
     const { error } = await SB().storage.from("press-files").upload(path, f, { contentType: f.type || "application/octet-stream" });
     if (error) { $("#pf-err").textContent = error.message; $("#pf-up").disabled = false; return; }
-    const { error: e2 } = await SB().from("press_files").insert({ company_id: S.company, job_id: j.id, kind: $("#pf-kind").value, title, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me() });
+    const { error: e2 } = await FR.save("press_files", null, { company_id: S.company, job_id: j.id, kind: $("#pf-kind").value, title, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me() });
     if (e2) { $("#pf-err").textContent = e2.message; $("#pf-up").disabled = false; return; } toast("File uploaded", "ok"); load(["files"]);
   });
   $("#pj-body").querySelectorAll("[data-fopen]").forEach(b => b.onclick = async () => { const f = files.find(x => x.id === b.dataset.fopen); const { data, error } = await SB().storage.from("press-files").createSignedUrl(f.file_path, 300); if (error) toast(error.message, "bad"); else window.open(data.signedUrl, "_blank", "noopener"); });
@@ -420,9 +420,8 @@ function openCustomer(id) {
   $("#c-save")?.addEventListener("click", async () => {
     const body = { company_id: S.company, name: $("#c-name").value.trim(), phone: $("#c-phone").value.trim(), email: $("#c-email").value.trim().toLowerCase(), address: $("#c-addr").value.trim(), notes: $("#c-notes").value.trim() };
     if (!body.name) { $("#c-err").textContent = "Name is required."; return; }
-    const q = id === "new" ? SB().from("press_customers").insert(body) : SB().from("press_customers").update(body).eq("id", id);
-    const { error } = await q; if (error) { $("#c-err").textContent = error.message; return; }
-    if (id !== "new") await SB().from("press_jobs").update({ customer_name: body.name }).eq("customer_id", id);
+    const { error } = id === "new" ? await FR.save("press_customers", null, body) : await FR.save("press_customers", id, FR.diff(c, body), { obj: c }); if (error) { $("#c-err").textContent = error.message; return; }
+    if (id !== "new" && body.name !== c.name) await SB().from("press_jobs").update({ customer_name: body.name }).eq("customer_id", id);   // display copy on many jobs; stays a direct write
     toast("Customer saved", "ok"); closeDrawer(); load(["customers", "jobs"]);
   });
 }
@@ -434,10 +433,10 @@ function editMaterial(m) {
   showDrawer(); $("#close").onclick = closeDrawer; $("#m-close").onclick = closeDrawer;
   $("#m-del")?.addEventListener("click", async () => { if (!confirm(`Delete ${m.name}? Its stock history is kept, and a Group Admin can restore it.`)) return; const r = await FR.softDelete("press_materials", m.id); if (!r.ok) toast(r.error, "bad"); else { closeDrawer(); load(["materials", "moves"]); } });
   $("#m-save").onclick = async () => {
-    const body = { company_id: S.company, name: $("#m-name").value.trim(), unit: $("#m-unit").value.trim() || "unit", reorder_level: N($("#m-re").value), unit_cost: N($("#m-cost").value), notes: $("#m-notes").value.trim(), updated_by: me(), updated_at: new Date().toISOString() };
+    const body = { company_id: S.company, name: $("#m-name").value.trim(), unit: $("#m-unit").value.trim() || "unit", reorder_level: N($("#m-re").value), unit_cost: N($("#m-cost").value), notes: $("#m-notes").value.trim() };
     if (!body.name) { $("#m-err").textContent = "Name is required."; return; }
-    if (isNew) { body.quantity = N($("#m-qty").value); const { error } = await SB().from("press_materials").insert(body); if (error) { $("#m-err").textContent = error.message; return; } }
-    else { const { error } = await SB().from("press_materials").update(body).eq("id", m.id); if (error) { $("#m-err").textContent = error.message; return; } }
+    if (isNew) { body.quantity = N($("#m-qty").value); const { error } = await FR.save("press_materials", null, body); if (error) { $("#m-err").textContent = error.message; return; } }
+    else { const { error } = await FR.save("press_materials", m.id, FR.diff(m, body), { obj: m }); if (error) { $("#m-err").textContent = error.message; return; } }
     toast("Material saved", "ok"); closeDrawer(); load(["materials"]);
   };
 }
@@ -449,7 +448,7 @@ function moveStock(m) {
   $("#mv-save").onclick = async () => {
     const qty = N($("#mv-qty").value); if (qty <= 0) { $("#mv-err").textContent = "Enter a quantity."; return; }
     const delta = $("#mv-dir").value === "in" ? qty : -qty;
-    const { error } = await SB().from("press_material_moves").insert({ company_id: S.company, material_id: m.id, job_id: $("#mv-job").value || null, delta, note: $("#mv-note").value.trim(), moved_by: me() });
+    const { error } = await FR.save("press_material_moves", null, { company_id: S.company, material_id: m.id, job_id: $("#mv-job").value || null, delta, note: $("#mv-note").value.trim(), moved_by: me() });
     if (error) { $("#mv-err").textContent = error.message; return; } toast("Stock updated", "ok"); closeDrawer(); load(["materials", "moves"]);
   };
 }
@@ -534,7 +533,7 @@ async function emailDoc(j, kind, p) {
     : `Good day ${first},\n\nThank you for your payment of ${money(p.amount)} on job ${j.number}. Your receipt ${p.receipt_no} is attached.${balanceOf(j) > 0 ? ` The remaining balance is ${money(balanceOf(j))}.` : " This job is fully paid."}\n\nKind regards,\n${S.me?.name || ""}\n${biz}`;
   toast("Sending…");
   const out = await callFunction("send-doc", { company: S.company, to: c.email, subject, text, html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#101828;max-width:600px">${esc(text).replace(/\n/g, "<br>")}</div>`, attachment: { name, mime: "application/pdf", base64 }, kind, ref: j.number });
-  if (out.status === "sent") { toast(`${kind[0].toUpperCase() + kind.slice(1)} emailed to ${c.email}`, "ok"); logAct("ok", `${name} emailed to ${c.email}`); if (kind === "quote") markSent(j); await SB().from("press_jobs").update({ history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: `${name} emailed to ${c.email}` }].slice(-100) }).eq("id", j.id); load(["jobs"]); }
+  if (out.status === "sent") { toast(`${kind[0].toUpperCase() + kind.slice(1)} emailed to ${c.email}`, "ok"); logAct("ok", `${name} emailed to ${c.email}`); if (kind === "quote") markSent(j); await FR.save("press_jobs", j.id, { history: [...(j.history || []), { ts: new Date().toISOString(), by: me(), summary: `${name} emailed to ${c.email}` }] }, { obj: j }); load(["jobs"]); }
   else { toast("Email failed: " + (out.detail || out.error || "unknown"), "bad"); logAct("bad", `Email of ${name} failed`, out.detail || out.error || ""); }
 }
 

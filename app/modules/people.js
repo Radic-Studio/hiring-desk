@@ -109,13 +109,13 @@ function renderLeave() {
     const start = $("#ml-start").value, end = $("#ml-end").value, kind = $("#ml-kind").value, reason = $("#ml-reason").value.trim(); $("#ml-err").textContent = "";
     if (!start || !end || end < start) { $("#ml-err").textContent = "Choose a valid date range."; return; }
     $("#ml-go").disabled = true;
-    const { error } = await SB().from("leave_requests").insert({ staff_id: mine.id, company_id: mine.company_id, kind, start_date: start, end_date: end, reason, requested_by: me() });
+    const { error } = await FR.save("leave_requests", null, { staff_id: mine.id, company_id: mine.company_id, kind, start_date: start, end_date: end, reason, requested_by: me() });
     $("#ml-go").disabled = false;
     if (error) { $("#ml-err").textContent = error.message; return; }
     toast("Leave request sent", "ok"); load(["leave"]);
   });
   el.querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => {
-    const { error } = await SB().from("leave_requests").update({ status: "cancelled" }).eq("id", b.dataset.cancel);
+    const { error } = await FR.save("leave_requests", b.dataset.cancel, { status: "cancelled" }, { obj: P.leave.find(l => l.id === b.dataset.cancel) });
     if (error) { toast(error.message, "bad"); return; } toast("Request cancelled"); load(["leave"]);
   });
 }
@@ -181,7 +181,7 @@ function paintDetails(s, isNew, locked) {
   $("#pd-upload")?.addEventListener("click", () => $("#pd-file").click());
   $("#pd-file")?.addEventListener("change", async e => {
     const f = e.target.files[0]; if (!f) return; $("#pd-upload").disabled = true; $("#pd-upload").textContent = "Uploading…";
-    try { const url = await uploadPhoto(s, f); await SB().from("staff").update({ photo_url: url }).eq("id", s.id); toast("Photo saved", "ok"); await load(["staff"]); }
+    try { const url = await uploadPhoto(s, f); const { error: pe } = await FR.save("staff", s.id, { photo_url: url }, { obj: s }); if (pe) throw pe; toast("Photo saved", "ok"); await load(["staff"]); }
     catch (err) { $("#pd-err").textContent = "Photo upload failed: " + (err.message || err); $("#pd-upload").disabled = false; $("#pd-upload").textContent = "Upload a photo"; }
   });
   $("#pd-del")?.addEventListener("click", async () => {
@@ -194,12 +194,14 @@ function paintDetails(s, isNew, locked) {
     const body = { company_id: $("#pd-company").value, companies: [...document.querySelectorAll("[data-also]:checked")].map(x => x.dataset.also), surname: v("pd-surname"), first_name: v("pd-first"), other_names: v("pd-other"), phone: v("pd-phone"), email: v("pd-email").toLowerCase(), position: v("pd-pos"), department: v("pd-dept"), employment_type: $("#pd-type").value, status: $("#pd-status").value, start_date: v("pd-start") || null, end_date: v("pd-end") || null, member_email: v("pd-member").toLowerCase() || null, address: v("pd-addr"), date_of_birth: v("pd-dob") || null, emergency_name: v("pd-ename"), emergency_phone: v("pd-ephone"), notes: v("pd-notes") };
     if (!body.surname || !body.first_name) { $("#pd-err").textContent = "Surname and first name are required."; return; }
     if (body.status === "left" && !body.end_date) body.end_date = today();
-    const changes = isNew ? ["Record created" + (s.candidate_id ? " from hiring" : "")] : Object.keys(body).filter(k => JSON.stringify(body[k] ?? "") !== JSON.stringify(s[k] ?? (Array.isArray(body[k]) ? [] : ""))).map(k => k.replace(/_/g, " "));
+    const changedKeys = isNew ? [] : Object.keys(body).filter(k => JSON.stringify(body[k] ?? "") !== JSON.stringify(s[k] ?? (Array.isArray(body[k]) ? [] : "")));
+    const changes = isNew ? ["Record created" + (s.candidate_id ? " from hiring" : "")] : changedKeys.map(k => k.replace(/_/g, " "));
     body.history = [...(s.history || []), { ts: new Date().toISOString(), by: me(), summary: changes.length ? changes.join(", ") : "Saved (no changes)" }].slice(-100);
     if (isNew && s.candidate_id) body.candidate_id = s.candidate_id;
     $("#pd-save").disabled = true;
-    const q = isNew ? SB().from("staff").insert(body).select("id").maybeSingle() : SB().from("staff").update(body).eq("id", s.id).select("id").maybeSingle();
-    const { data, error } = await q; $("#pd-save").disabled = false;
+    // existing record: send only the fields this person changed, with the version they were looking at
+    const patch = isNew ? body : Object.fromEntries([...changedKeys, "history"].map(k => [k, body[k]]));
+    const { data, error } = await FR.save("staff", isNew ? null : s.id, patch, isNew ? {} : { obj: s }); $("#pd-save").disabled = false;
     if (error) { $("#pd-err").textContent = error.message; return; }
     toast(isNew ? `${body.first_name} ${body.surname} added to staff` : "Saved", "ok"); logAct("ok", `${isNew ? "Added" : "Updated"} staff record: ${body.first_name} ${body.surname}`);
     if (isNew && s.candidate_id && FR.modules.hiring?.markHired) FR.modules.hiring.markHired(s.candidate_id, data?.id);
@@ -231,7 +233,7 @@ function paintDocs(s, locked) {
     const safe = f.name.replace(/[^A-Za-z0-9._-]+/g, "-"); const path = `${s.company_id}/${s.id}/${Date.now().toString(36)}-${safe}`;
     const { error } = await SB().storage.from("staff-docs").upload(path, f, { contentType: f.type || "application/octet-stream" });
     if (error) { $("#dc-err").textContent = error.message; $("#dc-up").disabled = false; $("#dc-up").textContent = "Upload"; return; }
-    const { error: e2 } = await SB().from("staff_documents").insert({ staff_id: s.id, company_id: s.company_id, kind, title, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me() });
+    const { error: e2 } = await FR.save("staff_documents", null, { staff_id: s.id, company_id: s.company_id, kind, title, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me() });
     $("#dc-up").disabled = false; $("#dc-up").textContent = "Upload";
     if (e2) { $("#dc-err").textContent = e2.message; return; }
     toast("Document uploaded", "ok"); logAct("ok", `Uploaded ${title} for ${s.full_name}`); await load(["docs"]);
@@ -259,7 +261,7 @@ function paintLeave(s, locked) {
     if (!start || !end || end < start) { $("#ll-err").textContent = "Choose a valid date range."; return; }
     const status = $("#ll-status").value;
     const row = { staff_id: s.id, company_id: s.company_id, kind: $("#ll-kind").value, start_date: start, end_date: end, reason: $("#ll-reason").value.trim(), requested_by: me(), status: "pending" };
-    const { data, error } = await SB().from("leave_requests").insert(row).select("id").maybeSingle();
+    const { data, error } = await FR.save("leave_requests", null, row);
     if (error) { $("#ll-err").textContent = error.message; return; }
     if (status === "approved" && data?.id) { const { error: e2 } = await SB().rpc("leave_decide", { p_id: data.id, p_status: "approved", p_note: "Recorded by " + me() }); if (e2) toast("Saved as pending: " + e2.message, "warn"); }
     toast("Leave recorded", "ok"); await load(["leave"]);

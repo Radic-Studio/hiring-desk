@@ -70,21 +70,75 @@ const live = (q, table) => SOFT.has(table) ? q.is("deleted_at", null) : q;
 FR.live = live;
 /** Soft-delete one record (and what belongs to it). Returns { ok, error, deletion }. */
 FR.softDelete = async (table, id) => { const { data, error } = await FR.SB.rpc("soft_delete", { p_entity: table, p_id: String(id) }); return error ? { ok: false, error: error.message } : { ok: true, deletion: data }; };
+/* ---------- the single write path (Stage 4) ----------
+ * Every change goes through the database function apply_op with an operation id made here.
+ * Sending the same id again (a retry after a dropped connection) can never apply the change twice.
+ * `base` is the record version this screen was showing; if someone else changed the same field since,
+ * the database keeps their value, files ours as a conflict for a Group Admin, and says so. */
+const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+const isNetErr = e => !e?.code && /fetch|network|load failed|timeout|aborted/i.test(e?.message || "");
+/**
+ * Save one record. FR.save(table, id or null, fields, { base, action, obj }) → { data: row, error, result }.
+ * id null = new record. obj = the local row object; its version is moved on after a successful save.
+ */
+FR.save = async (table, id, fields, opt = {}) => {
+  const op = opt.opId || uuid();
+  const action = opt.action || (id == null ? "insert" : "update");
+  const base = opt.base ?? opt.obj?.version ?? null;
+  const args = { p_op_id: op, p_entity: table, p_id: id == null ? null : String(id), p_action: action, p_patch: fields, p_base_version: base };
+  let data, error;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    ({ data, error } = await FR.SB.rpc("apply_op", args));
+    if (!error || !isNetErr(error)) break;
+    await new Promise(r => setTimeout(r, 500 * (attempt + 1) + Math.random() * 300));   // same op id: safe to resend
+  }
+  if (error) return { data: null, result: "failed", error: { code: isNetErr(error) ? "unavailable" : error.code, message: isNetErr(error) ? "No connection to the database. Nothing was saved." : error.message } };
+  const result = data?.result;
+  if (result === "applied" || result === "duplicate") {
+    if (opt.obj && data.version != null) opt.obj.version = data.version;
+    if (data.row && FR._rows[table]) FR._rows[table][String(data.row.id)] = data.row;
+    return { data: data.row, result, error: null };
+  }
+  if (result === "conflict") { if (data.row && FR._rows[table]) FR._rows[table][String(id)] = data.row; return { data: data.row, result, conflict: data, error: { code: "conflict", message: data.message } }; }
+  return { data: null, result: result || "refused", error: { code: /permission/i.test(data?.message || "") ? "42501" : "refused", message: data?.message || "Not saved" } };
+};
+FR._rows = {};   // last rows read per table, so the Hiring screens can send only what changed and the version they saw
+const cacheRows = (table, rows) => { const m = FR._rows[table] = FR._rows[table] || {}; rows.forEach(r => { m[String(r.id)] = r; }); };
+const same = (a, b) => {
+  if (JSON.stringify(a ?? null) === JSON.stringify(b ?? null)) return true;
+  if (typeof a === "string" && typeof b === "string" && /^\d{4}-\d\d-\d\d[T ]\d/.test(a) && /^\d{4}-\d\d-\d\d[T ]\d/.test(b)) return Date.parse(a) === Date.parse(b.replace(" ", "T"));
+  return false;
+};
+/** Only the fields of `body` that differ from the row on screen (history always travels: the database merges it). */
+FR.diff = (obj, body) => Object.fromEntries(Object.entries(body).filter(([k, v]) => k === "history" || !same(v, obj?.[k])));
+const SYSTEM_COLS = new Set(["id", "version", "op_id", "updated_at", "updated_by", "deleted_at", "deleted_by", "delete_batch"]);
 FR.dbShim = {
   doc(path) {
     const [table, id] = path.split("/");
     return {
       async set(body) {
-        const row = table === "settings" ? { id, data: body } : { id, ...toRow(table, body) };
-        const { error } = await FR.SB.from(table).upsert(row, { onConflict: "id" }); if (error) throw { code: error.code === "42501" ? "invalid_argument" : error.code, message: error.message };
+        if (table === "settings") {   // app-wide settings blob: not a business record
+          const { error } = await FR.SB.from(table).upsert({ id, data: body }, { onConflict: "id" });
+          if (error) throw { code: error.code === "42501" ? "invalid_argument" : error.code, message: error.message };
+          return;
+        }
+        const row = toRow(table, body), cached = FR._rows[table]?.[String(id)];
+        let patch = row, opt = { action: "save" };
+        if (cached) {
+          patch = {}; Object.keys(row).forEach(k => { if (!SYSTEM_COLS.has(k) && !same(row[k], cached[k])) patch[k] = row[k]; });
+          if (!Object.keys(patch).length) return;
+          opt = { action: "update", base: cached.version };
+        }
+        const r = await FR.save(table, id, patch, opt);
+        if (r.error) throw { code: r.error.code === "42501" ? "invalid_argument" : r.error.code, message: r.error.message };
       },
       async delete() { const r = await FR.softDelete(table, id); if (!r.ok) throw { code: "refused", message: r.error }; },
-      async get() { const { data, error } = await live(FR.SB.from(table).select("*").eq("id", id), table).maybeSingle(); if (error) throw { code: error.code, message: error.message }; return { exists: !!data, data: () => data ? (table === "settings" ? data.data : fromRow(table, data)) : undefined }; },
+      async get() { const { data, error } = await live(FR.SB.from(table).select("*").eq("id", id), table).maybeSingle(); if (error) throw { code: error.code, message: error.message }; if (data) cacheRows(table, [data]); return { exists: !!data, data: () => data ? (table === "settings" ? data.data : fromRow(table, data)) : undefined }; },
       onSnapshot(next, err) { const run = async () => { try { next(await this.get()); } catch (e) { err?.(e); } }; run(); return subscribe(table, run, id); },
     };
   },
   collection(table) {
-    return { onSnapshot(next, err) { const run = async () => { const { data, error } = await live(FR.SB.from(table).select("*"), table).limit(5000); if (error) { err?.({ code: error.code, message: error.message }); return; } next({ docs: data.map(r => ({ id: r.id, data: () => table === "settings" ? r.data : fromRow(table, r) })), metadata: { fromCache: false } }); }; run(); return subscribe(table, run); } };
+    return { onSnapshot(next, err) { const run = async () => { const { data, error } = await live(FR.SB.from(table).select("*"), table).limit(5000); if (error) { err?.({ code: error.code, message: error.message }); return; } cacheRows(table, data); next({ docs: data.map(r => ({ id: r.id, data: () => table === "settings" ? r.data : fromRow(table, r) })), metadata: { fromCache: false } }); }; run(); return subscribe(table, run); } };
   },
 };
 let writing = false;
@@ -95,7 +149,8 @@ FR.write = async (ref, body, okMsg) => {
   try { await ref.set(body); toast(okMsg, "ok"); return true; }
   catch (e) {
     if (e?.code === "invalid_argument" && S.canWrite !== true) { S.canWrite = false; FR.paintRole(); FR.render(); toast("You have view-only access", "warn"); }
-    else if (e?.code === "unavailable") { await new Promise(r => setTimeout(r, 400 + Math.random() * 400)); try { await ref.set(body); toast(okMsg, "ok"); return true; } catch { toast("Could not save, try again", "bad"); } }
+    else if (e?.code === "conflict") toast(e.message, "warn");
+    else if (e?.code === "unavailable") toast("No connection to the database. Nothing was saved; try again.", "bad");   // FR.save already retried with the same operation id
     else toast("Could not save: " + (e?.message || e?.code || "unknown error"), "bad");
     return false;
   } finally { writing = false; }

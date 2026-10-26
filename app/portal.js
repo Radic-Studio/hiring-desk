@@ -180,7 +180,9 @@ async function openReq(id) {
     <form class="pf" id="p-form"><div class="field"><textarea id="p-text" placeholder="Write to us about this request…"></textarea></div><div class="row"><span class="hint">We answer here and by email.</span><button class="btn primary small" id="p-send">Send</button></div></form>`;
   const close = () => { panel.hidden = scrim.hidden = true; panel.dataset.id = ""; };
   $(".x", panel).onclick = close; scrim.onclick = close;
-  $("#p-form").onsubmit = async e => { e.preventDefault(); const t = $("#p-text").value.trim(); if (!t) return; busy($("#p-send"), true); const { error } = await sb.from("customer_request_messages").insert({ request_id: id, company_id: CO, author: "customer", author_name: me.user_metadata?.full_name || me.email, body: t }); busy($("#p-send"), false, "Send"); if (error) return toast(authErr(error)); $("#p-text").value = ""; loadThread(id); };
+  $("#p-form").onsubmit = async e => { e.preventDefault(); const t = $("#p-text").value.trim(); if (!t) return; busy($("#p-send"), true); const args = { p_op_id: crypto.randomUUID(), p_entity: "customer_request_messages", p_id: null, p_action: "insert", p_patch: { request_id: id, company_id: CO, author: "customer", author_name: me.user_metadata?.full_name || me.email, body: t } };
+    let { data, error } = await sb.rpc("apply_op", args); if (error && !error.code) ({ data, error } = await sb.rpc("apply_op", args));   // one resend, same operation id: never a double message
+    if (!error && data && !["applied", "duplicate"].includes(data.result)) error = { message: data.message || "Not sent" }; busy($("#p-send"), false, "Send"); if (error) return toast(authErr(error)); $("#p-text").value = ""; loadThread(id); };
   loadThread(id);
 }
 async function loadThread(id) {
