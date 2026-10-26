@@ -2,3 +2,4 @@
 *.log
 .netlify/
 apps-script/tests/fixture_export.json
+.netlify/
