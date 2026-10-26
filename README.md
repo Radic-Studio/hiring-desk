@@ -48,6 +48,38 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 
 Each company can have a public link where customers read about it, create an account, send a job request with files and follow it: `/press/` is live (`press/index.html`, shared code in `app/portal.js` and `app/portal.css`; `<body data-company>` picks the company, so `/events/` is the same files with another folder once the Events module exists). The page content comes from `portal_public(company)` (name, `company_settings` module `portal`: tagline, about, phone, whatsapp, email, address, hours, steps; services from the active rate-card items). Customers are ordinary auth users with a `portal_profiles` row; they are never members and the staff app never lets them in. Requests live in `customer_requests` (+ `customer_request_files` in the private `customer-files` bucket, `customer_request_messages` for the thread), numbered `R-0001` per company, status new → quoted → in_progress → done / declined. Staff see them under Press → **Requests**: open one, reply (the customer sees it on the portal), add an internal note, change the status, or **Create quote from this**, which matches or creates the `press_customers` row by email, creates a `press_jobs` quote with the request's details and links it (`request_to_quote`). Supabase → Authentication → URL Configuration → Redirect URLs must include `https://future-ready-hiring-desk.netlify.app/press/` (or `/**`) so confirmation and reset links bring customers back to the portal rather than the staff sign-in.
 
+## Backups (pilot, Supabase Free)
+
+**Status: pilot protection on free infrastructure.** This is a custom off-site backup, not a provider-managed backup or an SLA. The recommended production upgrade is Supabase Pro (daily managed backups, no pausing), deferred until management approves operational use.
+
+Supabase stays the only live system of record. A standalone Google Apps Script (`apps-script/Backup.gs`), owned by a dedicated backup Google account, copies the database off-site:
+
+| Copy | When | Where | Kept |
+| --- | --- | --- | --- |
+| Rolling JSON | every 6 hours | `Future Ready Backups/database/rolling/future-ready-db-<UTC>.json` | 7 days |
+| Nightly JSON | 02:00 Lagos | `…/database/nightly/` | 90 days |
+| Month-end JSON | last day of the month | `…/database/monthly/future-ready-db-monthly-YYYY-MM.json` | 24 months |
+| Readable spreadsheet | nightly | `Future Ready Backups` spreadsheet in the same folder | latest only |
+
+Each JSON has `backup_format`, `generated_at`, `project`, `schema_version`, `table_list`, `row_counts`, `total_rows`, `status` and `checksum_sha256` (SHA-256 of `JSON.stringify(tables)`), then the data. The export comes from `public.backup_export()` (service role only): every public table is included automatically; columns named like token/secret/password are dropped and secret `app_config` values redacted; sign-in accounts are listed without passwords or sessions. The JSON is for restore and may hold personal data: the Drive folder must be shared with Group Admins only. The spreadsheet leaves out `app_config`, `member_invites`, `counters`, staff contact/address/birth/emergency/notes columns, profile phone numbers, leave reasons and history columns; every tab is protected (owner-only edit). Staff document files and Press/portal files are **not** copied yet (pending approval).
+
+Health: every run writes a row to `public.sync_runs` (kind, start, finish, tables, rows, file, checksum, status, error; Group Admins can read it) and a line to the spreadsheet's "Backup log". A failed run writes `backup-reports/backup-FAILED-…txt`, emails `ALERT_EMAILS`, never deletes old copies, and is queued for `sync_runs` if Supabase itself was unreachable. The first good run after failures sends a "recovered" email. Old copies are trashed only after a verified good run (Drive keeps trash 30 days).
+
+**Setup (once, in the backup Google account):** script.google.com → New project, name it "Future Ready Backups" → paste `apps-script/Backup.gs` → Project Settings: time zone (GMT+01:00) Lagos; Script properties `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALERT_EMAILS` → run `setup` and grant access. It creates the folders and spreadsheet, two triggers, records the folder and spreadsheet IDs in `app_config` (`backup_drive_folder_id`, `backup_sheet_id`, `backup_account`), and takes the first backup. `status` prints the state; `backupNow` takes an extra copy.
+
+Recorded locations (fill in after setup; IDs are not secrets, keys are never written here):
+
+| Item | Value |
+| --- | --- |
+| Backup account owner | _to fill_ |
+| Recovery email / phone on that account | _to fill_ |
+| Drive folder ID | _to fill_ (also in `app_config.backup_drive_folder_id`) |
+| Spreadsheet ID | _to fill_ (also in `app_config.backup_sheet_id`) |
+
+Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`node apps-script/tests/backup.test.js`, needs a `fixture_export.json` produced by `select public.backup_export()`, which is not committed because it holds personal data).
+
+**Free-plan pausing.** Supabase pauses a Free project after 7 days without activity. While paused the app and portal cannot load data; data is kept. To restore: Supabase dashboard → the project → **Restore project** (takes a few minutes), then reload the app. No artificial traffic is generated to avoid pausing; the backup job reads the database every 6 hours as part of its real work.
+
 ## Adding a module
 
 Create `app/modules/<id>.js`, call `FR.registerModule({ id, name, views: [{ id, title, sub, icon, count? }], start(), onCompany(), render() })`, add the script tag to `index.html` before `app/shell.js`, and list the module id in `companies.modules` for the companies that use it.
