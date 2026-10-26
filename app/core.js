@@ -128,7 +128,7 @@ FR.dbShim = {
     return {
       async set(body) {
         if (table === "settings") {   // app-wide settings blob: not a business record
-          const { error } = await FR.SB.from(table).upsert({ id, data: body }, { onConflict: "id" });
+          const { error } = await FR.SB.rpc("save_app_settings", { p_id: id, p_data: body });
           if (error) throw { code: error.code === "42501" ? "invalid_argument" : error.code, message: error.message };
           return;
         }

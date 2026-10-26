@@ -24,13 +24,19 @@ async function load(what = ["staff", "docs", "leave"]) {
   const jobs = [];
   if (what.includes("staff")) jobs.push(SB().from("staff").select("*").is("deleted_at", null).order("full_name").then(({ data, error }) => { if (error) { notice("bad", "Could not load staff: " + error.message); return; } P.all.staff = data || []; }));
   if (what.includes("docs")) jobs.push(SB().from("staff_documents").select("*").is("deleted_at", null).order("uploaded_at", { ascending: false }).then(({ data }) => { P.all.docs = data || []; }));
-  if (what.includes("leave")) jobs.push(SB().from("leave_requests").select("*").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => { P.all.leave = data || []; }));
+  if (what.includes("staff")) jobs.push(SB().from("staff_private").select("*").then(({ data }) => { P.all.priv = {}; for (const r of data || []) P.all.priv[r.id] = r; }));   // only rows this person may see
+  if (what.includes("leave")) {
+    jobs.push(SB().from("leave_requests").select("*").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => { P.all.leave = data || []; }));   // managers: all; others: their own
+    jobs.push(SB().rpc("leave_calendar", { p_company: S.company }).then(({ data }) => { P.cal = data || []; }));   // approved leave, names and dates only
+  }
   await Promise.all(jobs); scope(); render();
   if (P.open && P.open !== "new" && !$("#drawer").classList.contains("open")) P.open = null;
   else if (P.open) paintDrawer();
 }
-const onLeaveToday = s => P.leave.some(l => l.staff_id === s.id && l.status === "approved" && l.start_date <= today() && l.end_date >= today());
-const leaveUntil = s => (P.leave.filter(l => l.staff_id === s.id && l.status === "approved" && l.start_date <= today() && l.end_date >= today())[0] || {}).end_date;
+// approved leave: managers read it from leave_requests; everyone else from leave_calendar (no type or reason)
+const approvedLeave = () => canManage() ? P.leave.filter(l => l.status === "approved") : (P.cal || []);
+const onLeaveToday = s => approvedLeave().some(l => l.staff_id === s.id && l.start_date <= today() && l.end_date >= today());
+const leaveUntil = s => (approvedLeave().filter(l => l.staff_id === s.id && l.start_date <= today() && l.end_date >= today())[0] || {}).end_date;
 const statusPill = s => s.status === "left" ? `<span class="pill bad flat">Left${s.end_date ? " " + when(s.end_date) : ""}</span>` : onLeaveToday(s) ? `<span class="pill warn flat">On leave until ${when(leaveUntil(s))}</span>` : `<span class="pill ok flat">Active</span>`;
 const myStaff = () => P.all.staff.find(s => (s.member_email || "").toLowerCase() === me());
 const pendingToDecide = () => canManage() ? P.leave.filter(l => l.status === "pending") : [];
@@ -77,14 +83,14 @@ function renderStaff() {
 const staffName = id => (P.all.staff.find(s => s.id === id) || {}).full_name || "Unknown";
 function leaveRow(l, actions) {
   return `<div class="member"><div class="avatar">${esc((staffName(l.staff_id)[0] || "?").toUpperCase())}</div><div style="min-width:0"><b>${esc(staffName(l.staff_id))} <span class="pill ${l.status === "approved" ? "ok" : l.status === "pending" ? "warn" : l.status === "declined" ? "bad" : ""} flat">${l.status}</span></b>
-    <small>${KIND[l.kind] || l.kind} · ${when(l.start_date)} to ${when(l.end_date)} · ${l.days} day${l.days === 1 ? "" : "s"}${l.reason ? " · " + esc(l.reason) : ""}</small>
-    <small>${l.decided_by ? `${l.status} by ${esc(l.decided_by)} ${when(l.decided_at)}${l.decision_note ? " · " + esc(l.decision_note) : ""}` : `requested by ${esc(l.requested_by || "")} ${when(l.created_at)}`}</small></div>
+    <small>${l.kind ? (KIND[l.kind] || l.kind) + " · " : ""}${when(l.start_date)} to ${when(l.end_date)} · ${l.days} day${l.days === 1 ? "" : "s"}${l.reason ? " · " + esc(l.reason) : ""}</small>
+    <small>${!l.requested_by && !l.decided_by ? "approved" : l.decided_by ? `${l.status} by ${esc(l.decided_by)} ${when(l.decided_at)}${l.decision_note ? " · " + esc(l.decision_note) : ""}` : `requested by ${esc(l.requested_by || "")} ${when(l.created_at)}`}</small></div>
     <div class="acts">${actions || ""}</div></div>`;
 }
 function renderLeave() {
   const el = $("#v-leave"); const mine = myStaff(); const t = today();
   const toDecide = pendingToDecide();
-  const current = P.leave.filter(l => l.status === "approved" && l.end_date >= t).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const current = approvedLeave().filter(l => l.end_date >= t).sort((a, b) => a.start_date.localeCompare(b.start_date));
   const myLeave = mine ? P.all.leave.filter(l => l.staff_id === mine.id).slice(0, 20) : [];
   el.innerHTML = `
     ${canManage() ? `<div class="card"><h2>To decide <small>${toDecide.length ? toDecide.length + " waiting" : "nothing waiting"}</small></h2><div class="team-list">${toDecide.map(l => leaveRow(l, `<input type="text" id="ln-${l.id}" placeholder="Note (optional)" style="min-width:160px"><button class="btn small primary" data-decide="${l.id}" data-s="approved">Approve</button><button class="btn small danger" data-decide="${l.id}" data-s="declined">Decline</button>`)).join("") || `<p class="muted">Requests from staff in ${esc(FR.companyName(S.company))} appear here.</p>`}</div></div>` : ""}
@@ -128,8 +134,9 @@ function openDrawer(id, prefill) {
 }
 function paintDrawer() {
   const isNew = P.open === "new";
-  const s = isNew ? { company_id: S.company, companies: [], status: "active", employment_type: "full_time", start_date: today(), history: [], ...(P.prefill || {}) } : P.staff.find(x => x.id === P.open);
-  if (!s) return;
+  const row = isNew ? { company_id: S.company, companies: [], status: "active", employment_type: "full_time", start_date: today(), history: [], ...(P.prefill || {}) } : P.staff.find(x => x.id === P.open);
+  if (!row) return;
+  const s = isNew ? row : { ...row, ...privOf(row.id), id: row.id, version: row.version };   // private fields shown only if the database returned them
   const locked = !canManage();
   const tab = (id, label) => `<button aria-pressed="${P.tab === id}" data-tab="${id}">${label}</button>`;
   $("#drawer").innerHTML = `<header><div><h2>${isNew ? "New staff record" : esc(s.full_name || "(no name)")}</h2><div class="muted" style="margin-top:4px">${isNew ? esc(FR.companyName(S.company)) : `${esc(s.position || "No position")} · ${esc(FR.companyShort(s.company_id))} ${statusPill(s)}`}</div></div><button class="x" id="close" aria-label="Close">×</button></header>
@@ -146,8 +153,12 @@ function paintDrawer() {
   if (P.tab === "leave") paintLeave(s, locked);
   if (P.tab === "history") paintHistory(s);
 }
+const PRIVATE = ["address", "date_of_birth", "emergency_name", "emergency_phone", "notes"];
+const privOf = id => { const p = (P.all.priv || {})[id]; return p ? Object.fromEntries(PRIVATE.map(k => [k, p[k]])) : {}; };
+const isSelf = s => !!s.member_email && s.member_email.toLowerCase() === me();
 function paintDetails(s, isNew, locked) {
   const d = locked ? "disabled" : "";
+  const showPrivate = canManage() || isSelf(s);   // the database enforces the same rule; this only avoids empty boxes
   const others = S.companies.filter(c => c.active && c.id !== s.company_id);
   const members = (S.team || []).filter(m => m.status === "active");
   $("#pd-body").innerHTML = `
@@ -168,12 +179,12 @@ function paintDetails(s, isNew, locked) {
       <div class="field wide"><label>Home company</label><select id="pd-company" ${d || (isNew ? "" : "disabled")}>${S.companies.filter(c => c.active).map(c => `<option value="${c.id}" ${s.company_id === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
       ${others.length ? `<div class="field wide"><label>Also works for</label><div class="chips">${others.map(c => `<label class="chip" style="gap:6px"><input type="checkbox" data-also="${c.id}" ${(s.companies || []).includes(c.id) ? "checked" : ""} ${d}> ${esc(c.short_name)}</label>`).join("")}</div></div>` : ""}
       <div class="field wide"><label>Signs in as <span class="muted">(links this record to their login, for leave requests)</span></label><input id="pd-member" list="pd-members" value="${esc(s.member_email || "")}" placeholder="their Google email" ${d}><datalist id="pd-members">${members.map(m => `<option value="${esc(m.email)}">${esc(FR.memberName(m))}</option>`).join("")}</datalist></div>
-      <div class="field wide"><label>Home address</label><input id="pd-addr" value="${esc(s.address || "")}" ${d}></div>
+      ${showPrivate ? `<div class="field wide"><label>Home address</label><input id="pd-addr" value="${esc(s.address || "")}" ${d}></div>
       <div class="field"><label>Date of birth</label><input type="date" id="pd-dob" value="${esc(s.date_of_birth || "")}" ${d}></div>
-      <div class="field"><label>&nbsp;</label><span class="hint">Only Admins and Managers of this company see these details.</span></div>
+      <div class="field"><label>&nbsp;</label><span class="hint">Private: only Admins and Managers of this company, Group Admins and the person see these details.</span></div>
       <div class="field"><label>Emergency contact</label><input id="pd-ename" value="${esc(s.emergency_name || "")}" placeholder="Name" ${d}></div>
       <div class="field"><label>Emergency phone</label><input id="pd-ephone" value="${esc(s.emergency_phone || "")}" inputmode="tel" ${d}></div>
-      <div class="field wide"><label>Notes</label><textarea id="pd-notes" ${d}>${esc(s.notes || "")}</textarea></div>
+      <div class="field wide"><label>Notes</label><textarea id="pd-notes" ${d}>${esc(s.notes || "")}</textarea></div>` : ""}
     </div>
     <p class="hint" id="pd-err" style="color:var(--bad)"></p>`;
   $("#pd-foot").innerHTML = locked ? `<button class="btn" id="pd-close2">Close</button>` : `${isNew ? "" : `<button class="btn danger" id="pd-del">Delete record</button>`}<span style="flex:1"></span><button class="btn" id="pd-cancel">Cancel</button><button class="btn primary" id="pd-save">${isNew ? "Create record" : "Save"}</button>`;
@@ -191,18 +202,28 @@ function paintDetails(s, isNew, locked) {
   });
   $("#pd-save")?.addEventListener("click", async () => {
     const v = id => $("#" + id).value.trim();
-    const body = { company_id: $("#pd-company").value, companies: [...document.querySelectorAll("[data-also]:checked")].map(x => x.dataset.also), surname: v("pd-surname"), first_name: v("pd-first"), other_names: v("pd-other"), phone: v("pd-phone"), email: v("pd-email").toLowerCase(), position: v("pd-pos"), department: v("pd-dept"), employment_type: $("#pd-type").value, status: $("#pd-status").value, start_date: v("pd-start") || null, end_date: v("pd-end") || null, member_email: v("pd-member").toLowerCase() || null, address: v("pd-addr"), date_of_birth: v("pd-dob") || null, emergency_name: v("pd-ename"), emergency_phone: v("pd-ephone"), notes: v("pd-notes") };
+    const body = { company_id: $("#pd-company").value, companies: [...document.querySelectorAll("[data-also]:checked")].map(x => x.dataset.also), surname: v("pd-surname"), first_name: v("pd-first"), other_names: v("pd-other"), phone: v("pd-phone"), email: v("pd-email").toLowerCase(), position: v("pd-pos"), department: v("pd-dept"), employment_type: $("#pd-type").value, status: $("#pd-status").value, start_date: v("pd-start") || null, end_date: v("pd-end") || null, member_email: v("pd-member").toLowerCase() || null };
+    const priv = $("#pd-addr") ? { address: v("pd-addr"), date_of_birth: v("pd-dob") || null, emergency_name: v("pd-ename"), emergency_phone: v("pd-ephone"), notes: v("pd-notes") } : null;
     if (!body.surname || !body.first_name) { $("#pd-err").textContent = "Surname and first name are required."; return; }
     if (body.status === "left" && !body.end_date) body.end_date = today();
     const changedKeys = isNew ? [] : Object.keys(body).filter(k => JSON.stringify(body[k] ?? "") !== JSON.stringify(s[k] ?? (Array.isArray(body[k]) ? [] : "")));
-    const changes = isNew ? ["Record created" + (s.candidate_id ? " from hiring" : "")] : changedKeys.map(k => k.replace(/_/g, " "));
+    const privKeys = priv ? Object.keys(priv).filter(k => JSON.stringify(priv[k] ?? "") !== JSON.stringify(s[k] ?? "")) : [];
+    const changes = isNew ? ["Record created" + (s.candidate_id ? " from hiring" : "")] : [...changedKeys, ...privKeys].map(k => k.replace(/_/g, " "));
     body.history = [...(s.history || []), { ts: new Date().toISOString(), by: me(), summary: changes.length ? changes.join(", ") : "Saved (no changes)" }].slice(-100);
     if (isNew && s.candidate_id) body.candidate_id = s.candidate_id;
     $("#pd-save").disabled = true;
     // existing record: send only the fields this person changed, with the version they were looking at
     const patch = isNew ? body : Object.fromEntries([...changedKeys, "history"].map(k => [k, body[k]]));
-    const { data, error } = await FR.save("staff", isNew ? null : s.id, patch, isNew ? {} : { obj: s }); $("#pd-save").disabled = false;
-    if (error) { $("#pd-err").textContent = error.message; return; }
+    const { data, error } = await FR.save("staff", isNew ? null : s.id, patch, isNew ? {} : { obj: P.staff.find(x => x.id === s.id) });
+    if (error) { $("#pd-save").disabled = false; $("#pd-err").textContent = error.message; return; }
+    // private details: their own record (same id), saved only by Admins and Managers, only when something changed
+    const sid = data?.id || s.id, privRow = (P.all.priv || {})[sid];
+    if (priv && canManage() && (isNew ? Object.values(priv).some(x => x) : privKeys.length)) {
+      const pp = isNew || !privRow ? priv : Object.fromEntries(privKeys.map(k => [k, priv[k]]));
+      const { error: pe } = await FR.save("staff_private", sid, pp, privRow ? { obj: privRow } : { action: "save" });
+      if (pe) { $("#pd-save").disabled = false; $("#pd-err").textContent = "Saved, except the private details: " + pe.message; await load(["staff"]); return; }
+    }
+    $("#pd-save").disabled = false;
     toast(isNew ? `${body.first_name} ${body.surname} added to staff` : "Saved", "ok"); logAct("ok", `${isNew ? "Added" : "Updated"} staff record: ${body.first_name} ${body.surname}`);
     if (isNew && s.candidate_id && FR.modules.hiring?.markHired) FR.modules.hiring.markHired(s.candidate_id, data?.id);
     P.open = data?.id || P.open; P.prefill = null; await load(["staff"]); if (P.open) paintDrawer();

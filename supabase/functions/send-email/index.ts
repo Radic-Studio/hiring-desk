@@ -1,6 +1,8 @@
 // Future Ready Hiring Desk: send one outreach or interview email to a candidate.
 // The page sends only the candidate id and the rendered subject/body; the address is looked up here,
-// so a tampered page cannot email arbitrary recipients. Requires a signed-in member at contributor level or above.
+// so a tampered page cannot email arbitrary recipients. The caller must be able to see the candidate and write in its company
+// (Group Admin, or Admin/Manager/Staff of that company); the candidate is updated through apply_op as the caller, so the change
+// is attributed to them, logged, and merged into history instead of overwriting it.
 // Delivery: the message is relayed to the Google Apps Script attached to the "Future Ready Candidates" sheet,
 // which sends it from the company Gmail account (GmailApp). The script registers its own URL and a random token
 // in public.app_config when its setup() is run; nothing is configured by hand here.
@@ -22,8 +24,6 @@ Deno.serve(async (req) => {
   if (userErr || !userData?.user?.email) return json(401, { error: "not_signed_in" });
   const email = userData.user.email.toLowerCase();
   const admin = createClient(url, service);
-  const { data: member } = await admin.from("members").select("level,name").ilike("email", email).maybeSingle();
-  if (!member || !(["contributor", "editor"].includes(member.level))) return json(403, { error: "not_allowed", detail: "Your level cannot send email" });
 
   let body: { candidateId?: string; kind?: string; subject?: string; text?: string; formUrl?: string };
   try { body = await req.json(); } catch { return json(400, { error: "bad_json" }); }
@@ -31,8 +31,11 @@ Deno.serve(async (req) => {
   if (!candidateId || !subject.trim() || !text.trim()) return json(400, { error: "missing_fields" });
   if (!["outreach", "interview"].includes(kind)) return json(400, { error: "bad_kind" });
 
-  const { data: c } = await admin.from("candidates").select("*").eq("id", candidateId).maybeSingle();
+  // read as the caller: a candidate they cannot see does not exist for them
+  const { data: c } = await asUser.from("candidates").select("*").eq("id", candidateId).maybeSingle();
   if (!c) return json(404, { error: "no_candidate" });
+  const { data: canWrite } = await asUser.rpc("can_write_company", { cid: c.company_id || "group" });
+  if (!canWrite) return json(403, { error: "not_allowed", detail: "You cannot send email for this company" });
   if (!c.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email)) return json(422, { error: "no_email" });
 
   // simple per-user rate limit: 120 sends per rolling hour
@@ -73,6 +76,8 @@ Deno.serve(async (req) => {
     Object.assign(patch, { emailed_at: status === "sent" ? now : c.emailed_at, last_email_status: status, last_email_error: status === "sent" ? "" : errText });
     if (status === "sent" && c.status !== "contacted") { patch.status = "awaiting"; if (!c.mode) patch.mode = "Email"; }
   }
-  await admin.from("candidates").update(patch).eq("id", candidateId);
-  return json(200, { status, messageId, remaining, error: errText || undefined });
+  // record the outcome as the caller through the checked save path (history entries are merged, never overwritten)
+  const { data: saved, error: saveErr } = await asUser.rpc("apply_op", { p_op_id: crypto.randomUUID(), p_entity: "candidates", p_id: candidateId, p_action: "update", p_patch: patch, p_base_version: null });
+  const recorded = !saveErr && ["applied", "duplicate", "conflict"].includes(saved?.result);
+  return json(200, { status, messageId, remaining, recorded, error: errText || (recorded ? undefined : "The email outcome could not be recorded on the candidate: " + (saveErr?.message || saved?.message || "unknown")) });
 });

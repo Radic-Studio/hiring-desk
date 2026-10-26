@@ -135,6 +135,22 @@ test("T16 stale-backup warning", "A failure when the last good backup is over 8 
   return { pass: /more than 8 hours old/.test(S.mails.at(-1).text), actual: S.mails.at(-1).text.split("\n").filter(l => /Last successful|WARNING/.test(l)).join(" / ") };
 });
 
+test("T17 every run records per-table row counts and where the copy went", "sync_runs.details has row_counts equal to the export's, and a destination with the Drive path, file name and file id", () => {
+  const S = makeEnv({ now: "2026-10-26T08:00:00Z" }); S.ctx.setup();
+  const run = S.runs[0], d = run.details || {};
+  const countsOk = JSON.stringify(d.row_counts) === JSON.stringify(FIX.row_counts);
+  const dest = d.destination || {};
+  const pass = run.status === "success" && countsOk && /^Future Ready Backups\/database\/(nightly|rolling)$/.test(dest.drive_path || "") && dest.file_name === run.file_name && dest.file_id === run.drive_file_id;
+  return { pass, actual: `row_counts match ${countsOk} (${Object.keys(d.row_counts || {}).length} tables); destination ${JSON.stringify(dest)}` };
+});
+
+test("T18 the readable spreadsheet never gets private staff details or secrets", "No tab for staff_private, app_config, member_invites, counters or op_receipts", () => {
+  const S = makeEnv({ now: "2026-10-26T08:00:00Z" }); S.ctx.setup();
+  const tabs = Object.values(S.sheets).flatMap(x => x.getSheets().map(t => t.getName()));
+  const banned = ["staff_private", "app_config", "member_invites", "counters", "op_receipts"].filter(t => tabs.includes(t));
+  return { pass: tabs.length > 3 && !banned.length, actual: `${tabs.length} tabs; banned tabs present: ${JSON.stringify(banned)}` };
+});
+
 const pass = results.filter(r => r.pass).length;
 console.log(JSON.stringify(results, null, 1));
 console.log(`\n${pass}/${results.length} PASS`);

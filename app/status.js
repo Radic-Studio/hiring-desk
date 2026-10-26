@@ -51,8 +51,9 @@ async function compute() {
   const rtUp = !channels || (rt?.isConnected ? rt.isConnected() : true);
   if (rtUp) st.rtDownSince = 0; else if (!st.rtDownSince) st.rtDownSince = now;
   let state = "live";
+  const dbDown = navigator.onLine !== false && (st.netFails >= 2 || (st.lastNetFail > st.lastOk && st.netFails >= 1));
   if (navigator.onLine === false) { state = "offline"; r.push("This device has no internet connection."); }
-  else if (st.netFails >= 2 || (st.lastNetFail > st.lastOk && st.netFails >= 1)) { state = "offline"; r.push("The database cannot be reached."); }
+  else if (dbDown) { state = "degraded"; r.push("The database cannot be reached. If other websites also fail, this device has lost its internet connection."); }
   else {
     if (st.serverErrs.length) r.push(`The database returned ${st.serverErrs.length} error${st.serverErrs.length > 1 ? "s" : ""} in the last 2 minutes.`);
     if (st.lat.length >= 3 && median(st.lat) > SLOW_MS) r.push(`The database is answering slowly (about ${Math.round(median(st.lat) / 1000)} s).`);
@@ -61,13 +62,14 @@ async function compute() {
     if (r.length) state = "degraded";
   }
   const ob = FR.outbox ? await FR.outbox.list() : [];
-  const waiting = ob.filter(e => e.status === "waiting").length, refused = ob.length - waiting;
+  const waiting = ob.filter(e => e.status === "waiting" || e.status === "sending").length, attention = ob.length - waiting;
+  st.waiting = waiting;
   if (state !== "offline" && waiting) { state = "degraded"; r.push(`${waiting} change${waiting > 1 ? "s" : ""} on this device still waiting to synchronize.`); }
-  if (refused) { if (state === "live") state = "degraded"; r.push(`${refused} change${refused > 1 ? "s" : ""} on this device were not accepted. Open "Waiting to sync".`); }
-  const prev = st.state; st.state = state; st.reasons = r; paint();
-  if (prev !== state && st.started) {
-    if (state === "offline") logAct("bad", "Connection lost. Changes that can wait are kept on this device.");
-    else if (prev === "offline") { logAct("ok", "Connection restored"); FR.outbox?.flush(); }
+  if (attention) { if (state === "live") state = "degraded"; r.push(`${attention} change${attention > 1 ? "s" : ""} on this device need attention. Open "Waiting to sync".`); }
+  const prev = st.state, wasDown = st.dbDown || prev === "offline"; st.state = state; st.reasons = r; st.dbDown = dbDown || state === "offline"; paint();
+  if (st.started) {
+    if (!wasDown && st.dbDown) logAct("bad", "Connection to the database lost. Changes that can wait are kept on this device.");
+    else if (wasDown && !st.dbDown) { logAct("ok", "Connection restored"); FR.outbox?.flush(); loadBackupStamp(); }
   }
 }
 let timer = null;
@@ -77,7 +79,7 @@ const schedule = () => { clearTimeout(timer); timer = setTimeout(compute, 250); 
 async function probe() {
   if (st.probing || !st.started || document.hidden || !FR.SB || navigator.onLine === false) return;
   const quiet = Date.now() - Math.max(st.lastOk, st.lastNetFail);
-  if (st.state !== "offline" && quiet < IDLE_PROBE) return;
+  if (!st.dbDown && quiet < IDLE_PROBE) return;   // while the database is unreachable: a small check every 15 s
   st.probing = true;
   try { await FR.SB.from("companies").select("id").limit(1); } catch { /* recorded by the fetch watcher */ } finally { st.probing = false; schedule(); }
 }
@@ -112,7 +114,14 @@ function judge(runs) {
   return { level, notes, last, lastNightly, lastRolling, lastMonthly, lastFail,
     nextRolling: base ? new Date(Date.parse(base.started_at) + ROLLING_EVERY_H * 36e5) : null, nextNightly: nextNightly() };
 }
+/** Last successful backup time, for everyone signed in (only the time: details stay with Group Admins). */
+async function loadBackupStamp() {
+  if (!FR.SB || !st.started) return;
+  const { data, error } = await FR.SB.rpc("backup_last_success");
+  if (!error) { st.lastBackup = data || null; paint(); }
+}
 async function loadBackup() {
+  loadBackupStamp();
   if (!FR.S.access?.group_admin || !FR.SB) { st.backup = null; paint(); return; }
   const { data, error } = await FR.SB.from("sync_runs").select("kind,status,started_at,finished_at,tables,rows,file_name,error,details").order("started_at", { ascending: false }).limit(60);
   if (error) { st.backupErr = error.message; return; }
@@ -135,7 +144,11 @@ function renderPanel() {
   m.innerHTML = `<h2 id="st-title">System status</h2>
     <div class="st-head st-${st.state}"><i></i><div><b>${LABEL[st.state]}</b><small>${esc(st.reasons.join(" ") || "The database is answering normally and live updates are connected.")}</small></div></div>
     ${row("Last contact with the database", st.lastOk ? age(new Date(st.lastOk).toISOString()) : "not yet")}
-    ${st.state === "offline" ? `<p class="hint">You can keep working. Changes that can wait are kept on this device and sent when the connection is back. Payments, staff records, deletions and cancellations need a connection.</p>` : ""}
+    ${st.state !== "live" ? `${row("Data on screen as of", st.lastOk ? when(new Date(st.lastOk).toISOString()) : "not loaded yet")}
+      ${row("Changes waiting on this device", String(st.waiting || 0))}
+      ${row("Last successful backup", st.lastBackup ? `${when(st.lastBackup)} · ${age(st.lastBackup)}` : "unknown")}` : ""}
+    ${st.dbDown ? `<p class="hint">You can keep working. Changes that can wait are kept on this device and sent once when the connection is back.
+      <b>Unavailable until then:</b> payments, stock movements, staff records and private details, leave, deleting and restoring, cancelling, team and permission changes, invitations, settings, emails and file uploads.</p>` : ""}
     ${FR.S.access?.group_admin ? `<h3 class="st-sub">Backups <span class="bk-dot ${h?.level || ""}">${h ? { ok: "Healthy", warn: "Needs a look", bad: "Problem" }[h.level] : st.backupErr ? "Unavailable" : "Loading…"}</span></h3>
       ${st.backupErr ? `<p class="hint">Could not read backup history: ${esc(st.backupErr)}</p>` : h ? `
       ${h.notes.map(n => `<p class="st-note ${n.l}">${esc(n.m)}</p>`).join("")}

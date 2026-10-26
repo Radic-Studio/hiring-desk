@@ -226,7 +226,7 @@ function renderRates() {
   el.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm("Delete this rate card item? A Group Admin can restore it.")) return; const r = await FR.softDelete("press_rate_items", b.dataset.del); if (!r.ok) toast(r.error, "bad"); else load(["rates"]); });
   $("#cf-save")?.addEventListener("click", async () => {
     const data = { business_name: $("#cf-name").value.trim(), address: $("#cf-addr").value.trim(), phone: $("#cf-phone").value.trim(), email: $("#cf-email").value.trim(), prefix: ($("#cf-prefix").value.trim().toUpperCase() || "FRP").replace(/[^A-Z0-9]/g, ""), deposit_pct: N($("#cf-dep").value), valid_days: N($("#cf-valid").value) || 14, vat_pct: N($("#cf-vat").value), bank_name: $("#cf-bank").value.trim(), account_name: $("#cf-acct").value.trim(), account_number: $("#cf-acno").value.trim(), terms: $("#cf-terms").value.trim() };
-    const { error } = await SB().from("company_settings").upsert({ company_id: S.company, module: "press", data, updated_by: me(), updated_at: new Date().toISOString() }, { onConflict: "company_id,module" });
+    const { error } = await SB().rpc("save_company_settings", { p_company: S.company, p_module: "press", p_data: data });
     if (error) { toast(error.message, "bad"); return; } toast("Letterhead saved", "ok"); load(["settings"]);
   });
 }
@@ -424,7 +424,7 @@ function openCustomer(id) {
     const body = { company_id: S.company, name: $("#c-name").value.trim(), phone: $("#c-phone").value.trim(), email: $("#c-email").value.trim().toLowerCase(), address: $("#c-addr").value.trim(), notes: $("#c-notes").value.trim() };
     if (!body.name) { $("#c-err").textContent = "Name is required."; return; }
     const { error } = id === "new" ? await FR.save("press_customers", null, body) : await FR.save("press_customers", id, FR.diff(c, body), { obj: c }); if (error) { $("#c-err").textContent = error.message; return; }
-    if (id !== "new" && body.name !== c.name) await SB().from("press_jobs").update({ customer_name: body.name }).eq("customer_id", id);   // display copy on many jobs; stays a direct write
+    // a renamed customer: the database updates the name copy on their jobs (trigger sync_job_customer_name)
     toast("Customer saved", "ok"); closeDrawer(); load(["customers", "jobs"]);
   });
 }

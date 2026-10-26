@@ -25,7 +25,7 @@ const STALE_HOURS = 8;   // a warning is emailed when the newest successful data
 
 // Readable Sheet: whole tables left out, and columns left out of tables that are included.
 // The restricted JSON in Drive keeps these (it is what a restore needs); the Sheet is for reading, so it does not.
-const SHEET_SKIP_TABLES = ["app_config", "member_invites", "counters"];
+const SHEET_SKIP_TABLES = ["app_config", "member_invites", "counters", "staff_private", "op_receipts"];   // secrets, numbering state, private staff details
 const SHEET_SKIP_COLUMNS = {
   staff: ["phone", "email", "address", "date_of_birth", "emergency_name", "emergency_phone", "notes", "photo_url", "history"],
   members: ["phone", "photo_url", "user_id"],
@@ -134,7 +134,8 @@ function runBackup_(kind) {
     // 7. retention, only after a verified success
     const pruned = prune_();
     result = { ok: true, fileName: fileName, fileId: file.getId(), checksum: checksum, rows: exp.total_rows, tables: tables.length, bytes: body.length, monthly: monthly, pruned: pruned, sheetError: sheetError };
-    updateRun_(runId, { status: "success", finished_at: new Date().toISOString(), tables: tables.length, rows: exp.total_rows, bytes: body.length, file_name: fileName, drive_file_id: file.getId(), checksum: checksum, schema_version: exp.schema_version, format: BACKUP_FORMAT, error: sheetError ? "Sheet refresh failed: " + sheetError : null, details: { monthly: monthly, pruned: pruned } });
+    updateRun_(runId, { status: "success", finished_at: new Date().toISOString(), tables: tables.length, rows: exp.total_rows, bytes: body.length, file_name: fileName, drive_file_id: file.getId(), checksum: checksum, schema_version: exp.schema_version, format: BACKUP_FORMAT, error: sheetError ? "Sheet refresh failed: " + sheetError : null, details: { monthly: monthly, pruned: pruned, row_counts: exp.row_counts,
+      destination: { drive_path: "Future Ready Backups/database/" + folderName, file_name: fileName, file_id: file.getId(), spreadsheet_refreshed: kind === "nightly" && !sheetError } } });
     try { logSheet_([new Date(), kind, "success", fileName, tables.length, exp.total_rows, sheetError || ""]); } catch (e) { /* the log tab is a convenience; sync_runs is the record */ }
     const wasFailing = p.getProperty("FAILING_SINCE");
     p.setProperty("LAST_SUCCESS_AT", new Date().toISOString()); p.deleteProperty("FAILING_SINCE");

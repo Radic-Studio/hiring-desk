@@ -165,7 +165,8 @@ async function submitRequest(e) {
     const path = `${CO}/${me.id}/${r.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g, "_")}`;
     const { error: upErr } = await sb.storage.from("customer-files").upload(path, f, { contentType: f.type || "application/octet-stream" });
     if (upErr) { failed++; continue; }
-    await sb.from("customer_request_files").insert({ request_id: r.id, company_id: CO, name: f.name, file_path: path, size_bytes: f.size, mime: f.type, uploaded_by: me.id });
+    const { error: fe } = await sb.rpc("portal_attach_file", { p_request: r.id, p_name: f.name, p_path: path, p_size: f.size, p_mime: f.type || "" });
+    if (fe) failed++;
   }
   busy(b, false, "Send request"); $("#rf").reset(); delete form.dataset.ref;
   toast(`Request ${r.ref} sent${failed ? ` (${failed} file${failed > 1 ? "s" : ""} failed to upload)` : ""}`);

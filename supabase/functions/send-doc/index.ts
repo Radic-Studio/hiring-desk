@@ -1,5 +1,7 @@
 // Future Ready Group System: send a business document (quote, invoice, receipt, or any company email) with an optional PDF attachment.
 // Caller must have write access to the company (admin/manager/staff). Relays through the Gmail relay registered by the Apps Script.
+// Every attempt is written to ops_log (entity "email": who, to whom, subject, outcome; never the body or attachment), and a
+// sender is limited to 60 emails per rolling hour so a mistake or misuse cannot exhaust the Gmail quota.
 // Body: { company, to, subject, text, html?, replyTo?, attachment?: { name, mime, base64 }, kind?, ref? }
 // Deployed as `send-doc` (verify_jwt: true).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -27,6 +29,9 @@ Deno.serve(async (req) => {
   if (permErr || !canWrite) return json(403, { error: "not_allowed", detail: "You cannot send email for this company" });
 
   const admin = createClient(url, service);
+  const since = new Date(Date.now() - 3600_000).toISOString();
+  const { count: sentLastHour } = await admin.from("ops_log").select("id", { count: "exact", head: true }).eq("entity", "email").eq("actor", sender).gte("created_at", since);
+  if ((sentLastHour ?? 0) >= 60) return json(429, { error: "rate_limited", detail: "More than 60 emails in the last hour. Try again later." });
   const [{ data: cfgRows }, { data: co }] = await Promise.all([
     admin.from("app_config").select("key,value").in("key", ["mail_relay_url", "mail_relay_token"]),
     admin.from("companies").select("name").eq("id", company).maybeSingle(),
@@ -48,5 +53,9 @@ Deno.serve(async (req) => {
     try { out = JSON.parse(raw); } catch { out = { error: `Relay answered ${r.status}: ${raw.slice(0, 120)}` }; }
     if (r.ok && out.ok) status = "sent"; else errText = out.error || `Relay ${r.status}`;
   } catch (e) { errText = (e as Error).message; }
+  await admin.from("ops_log").insert({ op_id: crypto.randomUUID(), entity: "email", record_id: String(b.ref || to).slice(0, 120), company_id: company, action: "insert",
+    result: status === "sent" ? "applied" : "failed", actor: sender, actor_uid: userData.user.id, source: "function",
+    changes: { to, subject, kind: b.kind || "doc", attachment: attachments[0]?.name || null }, error: errText || null })
+    .then(({ error }) => { if (error) console.error("ops_log insert failed", error.message); });
   return json(200, { status, to, error: errText || undefined });
 });
