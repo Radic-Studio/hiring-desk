@@ -177,8 +177,40 @@ FR.callFunction = async (name, body) => {
   } catch (e) { return { error: "network", detail: e.message }; }
 };
 
+/* ---------- record drawer (shared by every module) ----------
+ * A dialog on the right (a full-screen sheet on phones). Opening it moves focus to its heading, Tab stays inside,
+ * Escape or the close button closes it, and focus goes back to the control that opened it. */
+const drawer = FR.drawer = {
+  back: null, isOpen: () => $("#drawer").classList.contains("open"),
+  show() {
+    const d = $("#drawer"), sc = $("#scrim");
+    if (!drawer.isOpen()) drawer.back = document.activeElement;
+    d.classList.add("open"); d.setAttribute("aria-hidden", "false"); d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true");
+    const h = d.querySelector("header h2"); if (h) { h.id = h.id || "drawer-title"; h.tabIndex = -1; d.setAttribute("aria-labelledby", h.id); }
+    sc.hidden = false; requestAnimationFrame(() => sc.classList.add("open"));
+    for (const el of [$(".app"), $("#bottom-nav")]) if (el) el.inert = true;
+    setTimeout(() => { if (drawer.isOpen() && !d.contains(document.activeElement)) (h || d).focus({ preventScroll: true }); }, 30);
+  },
+  hide() {
+    const d = $("#drawer"), sc = $("#scrim"); if (!drawer.isOpen()) return;
+    d.classList.remove("open"); d.setAttribute("aria-hidden", "true"); sc.classList.remove("open"); setTimeout(() => { if (!drawer.isOpen()) sc.hidden = true; }, 220);
+    for (const el of [$(".app"), $("#bottom-nav")]) if (el) el.inert = false;
+    const b = drawer.back; drawer.back = null; if (b && document.contains(b)) b.focus({ preventScroll: true });
+  },
+};
+document.addEventListener("keydown", e => {
+  if (e.key !== "Tab" || !drawer.isOpen()) return;
+  const f = [...$("#drawer").querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent !== null);
+  if (!f.length) return; const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !$("#drawer").contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+/** Save state shown next to a record title: "Saving…", "Saved", "Could not save · Retry". */
+FR.saveState = (el, state, msg) => { if (!el) return; el.className = "savestate " + state; el.textContent = msg || { saving: "Saving…", saved: "Saved", queued: FR.QUEUED_MSG, failed: "Could not save" }[state] || ""; };
+FR.money = n => "₦" + Number(n || 0).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
 /* ---------- module registry ---------- */
 FR.modules = {};
 FR.registerModule = m => { FR.modules[m.id] = m; };
-FR.render = () => { const m = FR.modules[S.module]; if (S.view === "team") FR.renderTeam?.(); else if (S.view === "deleted") FR.renderDeleted?.(); else if (S.view === "conflicts") FR.renderConflicts?.(); else m?.render?.(); };
+FR.render = () => { const m = FR.modules[S.module]; if (S.view === "home") FR.renderHome?.(); else if (S.view === "team") FR.renderTeam?.(); else if (S.view === "deleted") FR.renderDeleted?.(); else if (S.view === "conflicts") FR.renderConflicts?.(); else m?.render?.(); FR.afterRender?.(); };
 })();

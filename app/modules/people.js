@@ -127,8 +127,8 @@ function renderLeave() {
 }
 
 /* ---------- staff record drawer ---------- */
-function showDrawer() { $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden", "false"); $("#scrim").hidden = false; requestAnimationFrame(() => $("#scrim").classList.add("open")); $("#scrim").onclick = closeDrawer; }
-function closeDrawer() { P.open = null; $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("open"); setTimeout(() => { $("#scrim").hidden = true; }, 200); }
+function showDrawer() { FR.drawer.show(); $("#scrim").onclick = closeDrawer; }
+function closeDrawer() { P.open = null; FR.drawer.hide(); }
 function openDrawer(id, prefill) {
   P.open = id; P.tab = "details"; P.prefill = prefill || null; paintDrawer(); showDrawer();
 }
@@ -310,7 +310,7 @@ function fromCandidate(c, roleName) {
 
 /* ---------- registration ---------- */
 FR.registerModule({
-  id: "people", name: "People",
+  id: "people", name: "People", icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/></svg>',
   views: [
     { id: "staff", title: "Staff", sub: "Everyone who works here: details, documents and leave", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.5"/><path d="M5 18a4 4 0 0 1 8 0M14 9h4M14 13h4"/></svg>' },
     { id: "leave", title: "Leave", sub: "Requests to decide, and who is away when", count: true, icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M9 15l2 2 4-4"/></svg>' },

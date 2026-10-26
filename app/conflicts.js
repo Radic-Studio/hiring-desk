@@ -33,7 +33,8 @@ FR.loadConflicts = async function loadConflicts() {
   if (S.view === "conflicts") FR.renderConflicts();
   if (!loadConflicts.sub) loadConflicts.sub = FR.subscribe("conflicts", loadConflicts);
 };
-FR.paintConflictBadge = () => { const c = $("#cnt-conflicts"); if (!c) return; c.textContent = C.open.length; c.hidden = !C.open.length; };
+FR.openConflictCount = () => C.open.length;
+FR.paintConflictBadge = () => { FR.attentionChanged?.(); const c = $("#cnt-conflicts"); if (!c) return; c.textContent = C.open.length; c.hidden = !C.open.length; };
 
 /* ---------- display helpers ---------- */
 const rowOf = c => C.rows[c.entity]?.[String(c.record_id)];

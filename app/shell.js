@@ -17,23 +17,68 @@ function applyCompanyAccess() {
   if (S.me) { S.me.canEdit = r === "admin"; S.me.companyRole = r; }
 }
 
-/* ---------- navigation: companies × modules × views ---------- */
-const SHELL_VIEWS = { team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" },
-  deleted: { id: "deleted", title: "Recently deleted", sub: "Deleted records are kept here until a Group Admin restores them or removes them for good" },
+/* ---------- navigation: companies × modules × views ----------
+   Sidebar = Home + the modules this person can use in the selected company (+ Group admin pages).
+   Inside a module, its sections are links under the page title. Every page has a real address:
+   #/<company>/<view>[/<record id>], so a page or a filtered record can be bookmarked or shared. */
+const ICON = {
+  home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
+  team: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg>',
+  deleted: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg>',
+  conflicts: '<svg viewBox="0 0 24 24"><path d="M7 4v10M7 14l-3-3M7 14l3-3M17 20V10M17 10l-3 3M17 10l3 3"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+};
+const SHELL_VIEWS = {
+  home: { id: "home", title: "Home", sub: "What needs attention today, across the modules you use" },
+  team: { id: "team", title: "Team", sub: "Who can use the system, invitations and access requests" },
+  deleted: { id: "deleted", title: "Recently deleted", sub: "Deleted records stay here until a Group Admin restores them or removes them for good" },
   conflicts: { id: "conflicts", title: "Conflicts", sub: "Saves that clashed with someone else's change to the same field, waiting for a decision" } };
+S.lastView = S.lastView || {};
 // Hiring is a group-level function: only Group Admins (CEO, Directors, General Supervisor) see it, whichever company is selected.
 function companyModules(cid) { const c = S.companies.find(x => x.id === cid); return (c?.modules || ["hiring"]).filter(id => id !== "hiring" || isGroupAdmin()).map(id => FR.modules[id]).filter(Boolean); }
+FR.companyModules = companyModules;
 function viewDef(v) { if (SHELL_VIEWS[v]) return SHELL_VIEWS[v]; for (const m of companyModules(S.company)) { const d = m.views.find(x => x.id === v); if (d) return { ...d, module: m.id }; } return null; }
+const href = (v, param) => `#/${S.company}/${v}${param ? "/" + encodeURIComponent(param) : ""}`;
+FR.href = href;
+const modFirstView = m => S.lastView[m.id] && m.views.some(v => v.id === S.lastView[m.id]) ? S.lastView[m.id] : m.views.find(v => !v.hidden).id;
 function buildNav() {
   const mods = companyModules(S.company);
-  $("#tabs").innerHTML = mods.map(m => `<div class="nav-group">${mods.length > 1 ? `<div class="nav-head">${esc(m.name)}</div>` : ""}${m.views.map(v => `<button role="tab" data-view="${v.id}" title="${esc(v.nav || v.title)}">${v.icon || ""}<span class="lbl">${esc(v.nav || v.title)}</span>${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</button>`).join("")}</div>`).join("")
-    + (canManageTeam() || isGroupAdmin() ? `<div class="nav-group"><div class="nav-head">Group</div>${canManageTeam() ? `<button role="tab" data-view="team" id="tab-team" title="Team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 14.2a5 5 0 0 1 6 4.8"/></svg><span class="lbl">Team</span><span class="cnt" id="cnt-team" hidden>0</span></button>` : ""}${isGroupAdmin() ? `<button role="tab" data-view="deleted" id="tab-deleted" title="Recently deleted"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg><span class="lbl">Recently deleted</span><span class="cnt" id="cnt-deleted" hidden>0</span></button><button role="tab" data-view="conflicts" id="tab-conflicts" title="Conflicts"><svg viewBox="0 0 24 24"><path d="M7 4v10M7 14l-3-3M7 14l3-3M17 20V10M17 10l-3 3M17 10l3 3"/></svg><span class="lbl">Conflicts</span><span class="cnt" id="cnt-conflicts" hidden>0</span></button>` : ""}</div>` : "");
+  const item = (id, view, label, icon, extra = "") => `<a class="nav-item" href="${href(view)}" data-nav="${id}" data-view="${view}" title="${esc(label)}">${icon || ""}<span class="lbl">${esc(label)}</span>${extra}</a>`;
+  $("#tabs").innerHTML = `<div class="nav-group">${item("home", "home", "Home", ICON.home, `<span class="cnt" id="cnt-home" hidden>0</span>`)}${mods.map(m => item(m.id, modFirstView(m), m.name, m.icon)).join("")}</div>`
+    + (canManageTeam() || isGroupAdmin() ? `<div class="nav-group"><div class="nav-head">Group</div>${canManageTeam() ? item("team", "team", "Team", ICON.team, `<span class="cnt" id="cnt-team" hidden>0</span>`) : ""}${isGroupAdmin() ? item("deleted", "deleted", "Recently deleted", ICON.deleted, `<span class="cnt" id="cnt-deleted" hidden>0</span>`) + item("conflicts", "conflicts", "Conflicts", ICON.conflicts, `<span class="cnt" id="cnt-conflicts" hidden>0</span>`) : ""}</div>` : "");
+  // phones: Home + up to three modules + More (opens the full menu)
+  const bn = $("#bottom-nav");
+  bn.innerHTML = [item("home", "home", "Home", ICON.home), ...mods.slice(0, 3).map(m => item(m.id, modFirstView(m), m.name, m.icon))].join("").replace(/class="nav-item"/g, 'class="bn-item"')
+    + `<button type="button" class="bn-item" id="bn-more" aria-label="More: companies, team and account">${ICON.more}<span class="lbl">More</span></button>`;
+  bn.hidden = false; $("#bn-more").onclick = () => sideOpen(true);
   // one section per view, created once
   const main = $("main");
   for (const m of Object.values(FR.modules)) for (const v of m.views) if (!$("#v-" + v.id)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v.id; s.hidden = true; main.appendChild(s); }
   for (const v of Object.keys(SHELL_VIEWS)) if (!$("#v-" + v)) { const s = document.createElement("section"); s.className = "view"; s.id = "v-" + v; s.hidden = true; main.appendChild(s); }
-  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintDeletedBadge(); FR.paintConflictBadge?.();
+  paintCompanySwitch(); paintTeamBadge(); paintCompanyBadge(); paintDeletedBadge(); FR.paintConflictBadge?.(); markNav();
 }
+function markNav() {
+  const d = viewDef(S.view) || {}; const cur = d.module || S.view;
+  for (const a of document.querySelectorAll("#tabs [data-nav], #bottom-nav [data-nav]")) { const on = a.dataset.nav === cur; if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+  // module links remember the last section used
+  for (const m of companyModules(S.company)) for (const a of document.querySelectorAll(`[data-nav="${m.id}"]`)) a.setAttribute("href", href(modFirstView(m)));
+}
+function paintSubnav(d) {
+  const nav = $("#subnav"); const m = d.module && FR.modules[d.module];
+  if (!m) { nav.hidden = true; nav.innerHTML = ""; return; }
+  const cur = d.parent || d.id;
+  const keep = {}; for (const c of nav.querySelectorAll(".cnt")) keep[c.id] = [c.textContent, c.hidden];
+  nav.setAttribute("aria-label", `${m.name} sections`);
+  nav.innerHTML = m.views.filter(v => !v.hidden && (!v.can || v.can())).map(v => `<a href="${href(v.id)}" data-view="${v.id}" ${v.id === cur ? 'aria-current="page"' : ""}>${esc(v.nav || v.title)}${v.count ? `<span class="cnt" id="cnt-${v.id}" hidden>0</span>` : ""}</a>`).join("");
+  for (const [id, [t, h]] of Object.entries(keep)) { const c = document.getElementById(id); if (c) { c.textContent = t; c.hidden = h; } }
+  nav.hidden = false;
+}
+function paintPrimary(d) {
+  const b = $("#primary-btn"); const p = d.primary && (typeof d.primary === "function" ? d.primary() : d.primary);
+  if (!p || (p.can && !p.can())) { b.hidden = true; b.onclick = null; return; }
+  b.hidden = false; b.textContent = p.label; b.onclick = () => p.run();
+}
+FR.paintPrimary = () => { const d = viewDef(S.view); if (d) paintPrimary(d); };
 function paintDeletedBadge() { const c = $("#cnt-deleted"); if (!c) return; const n = DEL.open.length; c.textContent = n; c.hidden = !n; }
 const CO_ICON = { press: "./app/brand/app_icon_press.svg", events: "./app/brand/app_icon_events.svg" };
 function paintCompanyBadge() {
@@ -42,8 +87,8 @@ function paintCompanyBadge() {
   if (!c) { b.hidden = true; return; }
   b.hidden = false; b.innerHTML = `${CO_ICON[c.id] ? `<img src="${CO_ICON[c.id]}" alt="">` : ""}${esc(c.short_name)}`; b.title = c.name;
 }
-/* sidebar: collapsible rail on desktop, slide-in drawer on phones */
-const sideOpen = on => { document.body.classList.toggle("side-open", on); $("#side-scrim").hidden = !on; };
+/* sidebar: collapsible rail on desktop, slide-in drawer below 900 px */
+const sideOpen = on => { document.body.classList.toggle("side-open", on); $("#side-scrim").hidden = !on; if (on) setTimeout(() => $("#side-close")?.focus(), 50); };
 function initSide() {
   if (safeGet("fr_side") === "collapsed") document.body.classList.add("side-collapsed");
   $("#side-toggle").onclick = () => { const on = document.body.classList.toggle("side-collapsed"); safeSet("fr_side", on ? "collapsed" : "open"); $("#side-toggle").title = $("#side-toggle").ariaLabel = on ? "Expand menu" : "Collapse menu"; };
@@ -54,19 +99,19 @@ function initSide() {
 function paintCompanySwitch() {
   const el = $("#company-switch"); if (!el) return;
   const list = S.companies.filter(c => c.active && roleIn(c.id));
-  if (list.length <= 1) { el.innerHTML = `<div class="co-one"><b>${esc(FR.companyName(S.company) || "Future Ready")}</b></div>`; return; }
+  if (list.length <= 1) { el.innerHTML = `<div class="co-one"><span class="co-label">Company</span><b>${esc(FR.companyName(S.company) || "Future Ready")}</b></div>`; return; }
   const cur = list.find(c => c.id === S.company);
-  el.innerHTML = `<label class="co-label">Company</label><select id="company-sel" aria-label="Company">${list.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><button class="co-mini" id="co-mini" title="${esc(cur?.name || "")} · expand to switch">${esc((cur?.short_name || "FR").slice(0, 2).toUpperCase())}</button>`;
+  el.innerHTML = `<label class="co-label" for="company-sel">Company</label><select id="company-sel">${list.map(c => `<option value="${esc(c.id)}" ${c.id === S.company ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><button class="co-mini" id="co-mini" title="${esc(cur?.name || "")} · expand to switch">${esc((cur?.short_name || "FR").slice(0, 2).toUpperCase())}</button>`;
   $("#company-sel").onchange = e => switchCompany(e.target.value);
   $("#co-mini").onclick = () => $("#side-toggle").click();
 }
-function switchCompany(cid, view) {
+function switchCompany(cid, view, param) {
   if (!S.companies.some(c => c.id === cid && c.active) || !roleIn(cid)) cid = defaultCompany();
   const changed = cid !== S.company;
   S.company = cid; safeSet("fr_company", cid); applyCompanyAccess(); buildNav();
   if (changed) for (const m of companyModules(cid)) m.onCompany?.();
   FR.paintRole();
-  setView(view || (viewDef(S.view) ? S.view : "dashboard"));
+  setView(view || (viewDef(S.view) ? S.view : "home"), { param });
 }
 function defaultCompany() {
   const ok = S.companies.filter(c => c.active && roleIn(c.id)).sort((a, b) => a.order - b.order);
@@ -74,26 +119,113 @@ function defaultCompany() {
   return (ok.find(c => c.id === saved) || ok.find(c => c.kind === "group") || ok[0] || {}).id || null;
 }
 function setView(v, opts = {}) {
-  if ((v === "deleted" || v === "conflicts") && !isGroupAdmin()) v = "dashboard";
-  let d = viewDef(v); if (!d) { v = "dashboard"; d = viewDef(v); }
-  if (!d) { v = "team"; d = SHELL_VIEWS.team; }
-  S.view = v; S.module = d.module || null;
+  if ((v === "deleted" || v === "conflicts") && !isGroupAdmin()) v = "home";
+  if (v === "dashboard" && !viewDef("dashboard")) v = "home";
+  let d = viewDef(v); if (!d) { v = "home"; d = viewDef(v); }
+  const moved = v !== S.view;
+  S.view = v; S.module = d.module || null; S.param = opts.param ?? (moved ? null : S.param);
+  if (d.module && !d.hidden) S.lastView[d.module] = v;
   if (opts.role !== undefined) S.role = opts.role;
   if (opts.filters) S.filters = { q: "", status: "", loc: "", tier: "", avail: "", ...opts.filters };
-  for (const t of document.querySelectorAll(".nav button")) t.setAttribute("aria-selected", t.dataset.view === v);
   for (const s of document.querySelectorAll("main .view")) s.hidden = s.id !== "v-" + v;
+  const mod = d.module && FR.modules[d.module];
+  // context line: company, module (unless the company is named after it), and the list a record page belongs to (a link back)
+  const par = d.parent && viewDef(d.parent);
+  $("#crumb").innerHTML = [esc(FR.companyName(S.company) || ""), mod && !FR.companyName(S.company).toLowerCase().endsWith(mod.name.toLowerCase()) ? esc(mod.name) : "", par ? `<a href="${href(par.id)}" data-nav data-view="${par.id}">${esc(par.title)}</a>` : ""].filter(Boolean).join(" · ");
   $("#page-title").textContent = d.title; $("#page-sub").textContent = d.sub || "";
-  $("#dl-btn").hidden = !(d.module && FR.modules[d.module]?.headerDownload);
-  if (!/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", `#/${S.company}/${v}`); } catch {} }
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  $("#dl-btn").hidden = !(d.module && FR.modules[d.module]?.headerDownload && !d.hidden);
+  paintSubnav(d); paintPrimary(d); markNav();
+  if (!/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", href(v, S.param)); } catch {} }
+  if (moved) window.scrollTo({ top: 0 });
   sideOpen(false);
+  document.title = `${d.title} · Future Ready`;
   FR.render();
+  if (moved && opts.focus !== false) { const h = $("#page-title"); h.tabIndex = -1; if (document.activeElement && document.activeElement.closest && document.activeElement.closest("#tabs, #subnav, #bottom-nav")) h.focus({ preventScroll: true }); }
 }
 FR.setView = setView;
-function routeFromHash() { const m = (location.hash || "").match(/^#\/([a-z0-9-]+)\/([a-z0-9-]+)/); return m ? { company: m[1], view: m[2] } : { view: (location.hash || "").replace("#", "") }; }
-$("#tabs").addEventListener("click", e => { const t = e.target.closest("button[data-view]"); if (t) setView(t.dataset.view); });
-$(".foot-site nav").addEventListener("click", e => { const a = e.target.closest("a[data-view]"); if (a) { e.preventDefault(); setView(a.dataset.view); } });
-window.addEventListener("hashchange", () => { if (!S.me) return; const r = routeFromHash(); if (r.company && r.company !== S.company) switchCompany(r.company, r.view); else if (r.view && r.view !== S.view) setView(r.view); });
+FR.openRecord = (view, id) => setView(view, { param: id });
+function routeFromHash() { const m = (location.hash || "").match(/^#\/([a-z0-9-]+)\/([a-z0-9-]+)(?:\/([^/?#]+))?/); return m ? { company: m[1], view: m[2], param: m[3] ? decodeURIComponent(m[3]) : null } : { view: (location.hash || "").replace("#", "") }; }
+// links carry real addresses; a plain click is routed here so the page does not reload or scroll
+document.addEventListener("click", e => {
+  const a = e.target.closest("#tabs a[data-view], #subnav a[data-view], #bottom-nav a[data-view], #crumb a[data-view]");
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  e.preventDefault(); setView(a.dataset.view);
+});
+window.addEventListener("hashchange", () => { if (!S.me) return; const r = routeFromHash(); if (r.company && r.company !== S.company) switchCompany(r.company, r.view, r.param); else if (r.view && (r.view !== S.view || (r.param || null) !== (S.param || null))) setView(r.view, { param: r.param }); });
+
+/* ---------- Home: what needs attention today ----------
+   Each module may offer attention(): [{ id, level: "bad"|"warn"|"info", label, count, hint, go, items: [{ title, meta, go }] }].
+   Home shows the counts first (each opens the filtered list), then the concrete records, most urgent first. */
+const LEVEL_ORDER = { bad: 0, warn: 1, info: 2 };
+function groupAttention() {
+  const out = [];
+  const pend = pendingForMe();
+  if (pend.length) out.push({ id: "team", level: "warn", label: "Access requests", count: pend.length, hint: "waiting for approval", go: () => setView("team"), items: pend.slice(0, 4).map(m => ({ title: FR.memberName(m), meta: `asked for ${ROLE_LABEL[m.requested_role] || "access"}${m.requested_company ? " in " + FR.companyShort(m.requested_company) : ""}`, go: () => setView("team") })) });
+  const cf = FR.openConflictCount?.() || 0;
+  if (cf && isGroupAdmin()) out.push({ id: "conflicts", level: "warn", label: "Conflicts", count: cf, hint: "saves waiting for a decision", go: () => setView("conflicts"), items: [] });
+  return out;
+}
+FR.renderHome = function renderHome() {
+  const el = $("#v-home"); if (!el || !S.me) return;
+  const mods = companyModules(S.company);
+  const groups = [...mods.flatMap(m => (m.attention?.() || []).map(g => ({ ...g, module: m.name }))), ...groupAttention()];
+  const live = groups.filter(g => g.count > 0).sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level] || b.count - a.count);
+  const items = live.flatMap(g => (g.items || []).map(it => ({ ...it, level: g.level, group: g.label, module: g.module }))).sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]);
+  const loading = mods.some(m => m.ready && !m.ready());
+  const hour = new Date().getHours(); const first = (S.me.name || "").split(" ")[0];
+  const n = live.reduce((s, g) => s + g.count, 0); const c = $("#cnt-home"); if (c) { c.textContent = n; c.hidden = !n; }
+  el.innerHTML = `<p class="lead">${hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"}, ${esc(first)}. ${loading ? "Loading your work…" : live.length ? `${n} thing${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} attention in ${esc(FR.companyName(S.company))}.` : `Nothing needs attention in ${esc(FR.companyName(S.company))} right now.`}</p>
+    ${loading && !live.length ? `<div class="stat-row">${[1, 2, 3, 4].map(() => `<div class="stat sk"><span class="skeleton" style="width:60%"></span><span class="skeleton" style="width:30%;height:26px"></span></div>`).join("")}</div>` : ""}
+    ${groups.length ? `<div class="stat-row">${groups.sort((a, b) => (b.count > 0) - (a.count > 0) || LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]).slice(0, 8).map((g, i) => `<button type="button" class="stat ${g.count ? g.level : "clear"}" data-g="${i}"><span class="stat-label">${esc(g.label)}</span><span class="stat-value">${g.count}</span><span class="stat-hint">${esc(g.count ? g.hint || "" : "all clear")}${mods.length > 1 && g.module ? ` · ${esc(g.module)}` : ""}</span></button>`).join("")}</div>` : ""}
+    <section class="panel" aria-labelledby="att-h"><div class="panel-head"><h2 id="att-h">Needs attention</h2><span class="muted">${items.length ? `${Math.min(items.length, 12)} of ${items.length}, most urgent first` : ""}</span></div>
+      ${items.length ? `<ul class="att-list">${items.slice(0, 12).map((it, i) => `<li><span class="lv ${it.level}" aria-hidden="true"></span><button type="button" class="att-main" data-i="${i}"><b>${esc(it.title)}</b><span>${esc(it.meta || "")}</span></button><span class="att-tag">${esc(it.group)}</span></li>`).join("")}</ul>`
+        : `<div class="empty-inline">${loading ? "Checking…" : "All clear. New work will appear here as it comes in."}</div>`}
+    </section>
+    <section class="panel" aria-labelledby="go-h"><div class="panel-head"><h2 id="go-h">Go to</h2></div><div class="go-grid">${mods.map(m => `<a class="go-card" href="${href(modFirstView(m))}" data-go="${m.id}">${m.icon || ""}<span><b>${esc(m.name)}</b><small>${esc(m.views.filter(v => !v.hidden).map(v => v.nav || v.title).slice(0, 4).join(" · "))}</small></span></a>`).join("")}</div></section>`;
+  const sorted = groups;
+  el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => sorted[+b.dataset.g].go?.());
+  el.querySelectorAll(".att-main").forEach(b => b.onclick = () => items[+b.dataset.i].go?.());
+  el.querySelectorAll("[data-go]").forEach(a => a.onclick = e => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); setView(modFirstView(FR.modules[a.dataset.go])); });
+};
+// modules call this when their data changes so Home and its badge stay current
+FR.attentionChanged = () => { clearTimeout(FR.attentionChanged.t); FR.attentionChanged.t = setTimeout(() => { if (S.view === "home") FR.renderHome(); else { const mods = companyModules(S.company); const n = [...mods.flatMap(m => m.attention?.() || []), ...groupAttention()].reduce((s, g) => s + (g.count > 0 ? g.count : 0), 0); const c = $("#cnt-home"); if (c) { c.textContent = n; c.hidden = !n; } } }, 120); };
+
+/* ---------- global search ----------
+   One box for everything this person may see: modules offer search(q) → [{ title, meta, go }] from the data
+   already on screen (so it obeys the same access rules). Results are grouped by module; arrows + Enter work. */
+const GS = { results: [], active: -1 };
+function runSearch(q) {
+  const box = $("#gsearch"), pop = $("#gsearch-pop"), list = $("#gsearch-list"), empty = $("#gsearch-empty");
+  q = q.trim(); GS.active = -1;
+  if (q.length < 2) { pop.hidden = true; box.setAttribute("aria-expanded", "false"); box.removeAttribute("aria-activedescendant"); return; }
+  const groups = companyModules(S.company).map(m => ({ m, rows: (m.search?.(q) || []).slice(0, 6) })).filter(g => g.rows.length);
+  GS.results = groups.flatMap(g => g.rows.map(r => ({ ...r, module: g.m.name })));
+  let i = 0;
+  list.innerHTML = groups.map(g => `<li role="presentation" class="gs-head">${esc(g.m.name)}</li>${g.rows.map(r => `<li role="option" id="gs-${i}" data-i="${i++}" aria-selected="false"><b>${esc(r.title)}</b><span>${esc(r.meta || "")}</span></li>`).join("")}`).join("");
+  empty.hidden = !!GS.results.length; empty.textContent = `Nothing matches "${q}". Search by name, phone, email, or a job, quote or receipt number.`;
+  pop.hidden = false; box.setAttribute("aria-expanded", "true");
+  list.querySelectorAll("[role=option]").forEach(o => o.onmousedown = e => { e.preventDefault(); pickSearch(+o.dataset.i); });
+}
+function pickSearch(i) { const r = GS.results[i]; if (!r) return; closeSearch(true); r.go(); }
+function closeSearch(clear) { $("#gsearch-pop").hidden = true; $("#gsearch").setAttribute("aria-expanded", "false"); $("#gsearch").removeAttribute("aria-activedescendant"); if (clear) $("#gsearch").value = ""; document.body.classList.remove("search-open"); }
+function moveSearch(d) {
+  const opts = [...document.querySelectorAll("#gsearch-list [role=option]")]; if (!opts.length) return;
+  GS.active = (GS.active + d + opts.length) % opts.length;
+  opts.forEach((o, k) => o.setAttribute("aria-selected", k === GS.active)); $("#gsearch").setAttribute("aria-activedescendant", opts[GS.active].id); opts[GS.active].scrollIntoView({ block: "nearest" });
+}
+(function initSearch() {
+  const box = $("#gsearch"); let t = null;
+  box.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => runSearch(box.value), 120); });
+  box.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { e.preventDefault(); if ($("#gsearch-pop").hidden) runSearch(box.value); moveSearch(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveSearch(-1); }
+    else if (e.key === "Enter") { e.preventDefault(); pickSearch(GS.active >= 0 ? GS.active : 0); }
+    else if (e.key === "Escape") { e.stopPropagation(); closeSearch(true); box.blur(); }
+  });
+  box.addEventListener("blur", () => setTimeout(() => closeSearch(false), 120));
+  $("#search-btn").onclick = () => { document.body.classList.add("search-open"); box.focus(); };
+  document.addEventListener("keydown", e => { if (e.key === "/" && !e.target.closest("input,textarea,select,[contenteditable]") && S.me && !FR.drawer.isOpen()) { e.preventDefault(); document.body.classList.add("search-open"); box.focus(); } });
+})();
 
 /* ---------- account panel ---------- */
 function roleLabel() { if (!S.me) return "Not signed in"; if (isGroupAdmin()) return "Group Admin"; return ROLE_LABEL[S.me.companyRole] || "No access"; }
@@ -406,7 +538,7 @@ async function enter(session) {
   for (const m of Object.values(FR.modules)) m.start?.();
   loadMembers(); if (isGroupAdmin()) { loadDeleted(); FR.loadConflicts?.(); }
   FR.subscribe("companies", async () => { const { data } = await SB().from("companies").select("*").order("order"); if (data) { S.companies = data; buildNav(); if (S.view === "team") FR.render(); } });
-  setView(r.view && viewDef(r.view) ? r.view : "dashboard");
+  setView(r.view && viewDef(r.view) ? r.view : "home", { param: r.param });
   if (!access.profile_done) openProfile(true);
 }
 async function loadMembers() {
@@ -423,7 +555,7 @@ async function loadMembers() {
   if (!loadMembers.sub) { loadMembers.sub = FR.subscribe("members", loadMembers); loadMembers.sub2 = FR.subscribe("company_members", loadMembers); }
 }
 function pendingForMe() { return (S.team || []).filter(m => m.status === "pending" && (isGroupAdmin() || (m.requested_company && isCompanyAdmin(m.requested_company)))); }
-function paintTeamBadge() { const c = $("#cnt-team"); if (!c) return; const n = pendingForMe().length; c.textContent = n; c.hidden = !n; }
+function paintTeamBadge() { FR.attentionChanged?.(); const c = $("#cnt-team"); if (!c) return; const n = pendingForMe().length; c.textContent = n; c.hidden = !n; }
 
 /* ---------- profile ---------- */
 function openProfile(first) {

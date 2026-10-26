@@ -717,7 +717,7 @@ function renderHistory(comp) {
 /* ---------- add / remove a candidate ---------- */
 const nextSn = rid => byRole(rid).reduce((m, c) => Math.max(m, Number(c.sn) || 0), 0) + 1;
 const candId = (rid, sn) => `${rid}-${String(sn).padStart(3, "0")}`;
-function showDrawer() { $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden", "false"); $("#scrim").hidden = false; requestAnimationFrame(() => $("#scrim").classList.add("open")); $("#close").onclick = closeDrawer; $("#scrim").onclick = closeDrawer; }
+function showDrawer() { FR.drawer.show(); $("#close").onclick = closeDrawer; $("#scrim").onclick = closeDrawer; }
 function openAddDrawer(rid) {
   if (!rid || ro()) return; S.open = "new";
   const sel = (idn, opts, val) => `<select id="${idn}">${opts.map(x => `<option ${x === val ? "selected" : ""}>${x}</option>`).join("")}</select>`;
@@ -819,7 +819,7 @@ function openDrawer(id) {
   $("#noanswer")?.addEventListener("click", () => saveDrawer(c, true));
   resolveNames(names);
 }
-function closeDrawer() { S.open = null; $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("open"); setTimeout(() => { $("#scrim").hidden = true; }, 200); }
+function closeDrawer() { S.open = null; FR.drawer.hide(); }
 async function saveDrawer(c, noAnswer = false) {
   const v = id => $("#" + id)?.value ?? "";
   const status = noAnswer ? "attempted" : [...$("#status").children].find(b => b.getAttribute("aria-pressed") === "true")?.dataset.v || "pending";
@@ -859,7 +859,7 @@ function scope() {
 }
 let started = false;
 FR.registerModule({
-  id: "hiring", name: "Hiring", views: VIEW_DEFS,
+  id: "hiring", name: "Hiring", views: VIEW_DEFS, icon: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>',
   start() {
     if (started) return; started = true;
     S.db.doc("settings/scoring").onSnapshot(s => { if (s.exists) { const d = s.data(); S.settings = { ...DEFAULT_SETTINGS, location: d.location || DEFAULT_SETTINGS.location, qualification: d.qualification || DEFAULT_SETTINGS.qualification, availability: d.availability || DEFAULT_SETTINGS.availability, relocation: d.relocation ?? 10 }; } render(); }, () => {});
