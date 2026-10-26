@@ -132,3 +132,32 @@ from pg_constraint where connamespace = 'public'::regnamespace
 union all select md5(string_agg(indexdef, ',' order by indexname))
 from pg_indexes where schemaname = 'public';
 ```
+
+Rights check. Also run this in both projects; the two values must match (who may read, write or call what):
+```sql
+select md5(string_agg(c.relname||':'||r||':'||p, ',' order by c.relname, r, p))
+from pg_class c join pg_namespace n on n.oid=c.relnamespace, unnest(array['anon','authenticated','service_role']) r, unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
+where n.nspname='public' and c.relkind='r' and has_table_privilege(r, c.oid, p)
+union all
+select md5(string_agg(f.oid::regprocedure::text||':'||r, ',' order by f.oid::regprocedure::text, r))
+from pg_proc f join pg_namespace n on n.oid=f.pronamespace, unnest(array['anon','authenticated','service_role']) r
+where n.nspname='public' and has_function_privilege(r, f.oid, 'execute');
+```
+
+## Last full restore test: 26 Oct 2026 (passed)
+
+| Check | Result |
+|---|---|
+| Source | `backup_export()` of live at 14:21 UTC: 31 tables, 290 rows, 5 sign-in accounts, md5 `e37a7fed…` |
+| Schema | `schema_snapshot.sql` at commit 65128ef, run into an emptied test project |
+| Load | all 31 tables restored; row counts equal the backup's own counts |
+| Content | every one of the 290 rows identical field by field to the backup |
+| Relationships | 0 orphans: candidates→roles, issues→candidates, every company_id→companies, jobs/requests in the same company as their customer, requests→accounts, staff_private and leave→staff, members→accounts |
+| Soft deletes | the 2 deleted candidates are still deleted and still listed in Recently deleted |
+| Stock | quantities as backed up (movements not applied twice) |
+| Versions, log | versions kept (e.g. gd-48 = 3); operations-log counter moved past the restored rows |
+| Secrets | relay token stays `[REDACTED]`; invitation tokens regenerated; no passwords restored |
+| Access (RLS) | Group Admin sees all incl. deleted and can save; Press Staff sees jobs and directory but not candidates, private staff details, leave or the log, cannot edit materials, and a stock movement updates quantity (40 → 37); Customer sees only own request and messages and cannot add a customer; anonymous sees nothing except the public portal page |
+| Structure | the six drift fingerprints and both rights fingerprints match live |
+| Older backups | a pre-26-Oct backup with address/date of birth/emergency contact/notes on `staff` restores them into `staff_private` |
+| After the test | test data and accounts deleted from the test project; project paused. Recorded in `sync_runs` (kind `restore_test`). |
