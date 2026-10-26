@@ -55,7 +55,7 @@ img{max-width:100%}
 .gate-show .ad[data-co="press"]{--co-accent:var(--co-press)}
 .gate-show .cap{position:absolute;left:22px;right:22px;bottom:64px;z-index:3;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.4);animation:cap-in .7s var(--ease)}
 .gate-show .cap h2{font:600 26px/1.15 var(--display);margin:0 0 10px;letter-spacing:-.01em;max-width:18ch}
-.gate-show .cap .pill{display:inline-block;font:500 12px var(--body);padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);text-shadow:none;backdrop-filter:blur(4px)}
+.gate-show .cap .pill{display:inline-block;color:#fff;font:500 12px var(--body);padding:6px 12px;border-radius:999px;background:rgba(7,30,25,.55);border:1px solid rgba(255,255,255,.35);text-shadow:none}
 .gate-show .ctl{position:absolute;left:22px;right:22px;bottom:18px;z-index:3;display:flex;align-items:center;gap:8px}
 .gate-show .ctl button{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:16px;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(4px);transition:background var(--fast)}
 .gate-show .ctl button:hover{background:rgba(255,255,255,.3)}
