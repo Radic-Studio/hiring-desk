@@ -36,7 +36,7 @@ FR.openActivity = () => {
 FR.fmtDate = ts => { try { return new Date(ts).toLocaleString("en-NG", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
 FR.when = ts => { if (!ts) return ""; try { return new Date(ts).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }); } catch { return ""; } };
 FR.notice = (kind, msg) => { const n = $("#notice"); n.hidden = !msg; n.className = "banner " + kind; n.textContent = msg; };
-FR.setSync = (ok, text) => { const s = $("#sync"); s.classList.toggle("off", !ok); s.querySelector("span").textContent = text; };
+FR.setSync = (ok, text) => { if (FR.statusActive) return;   /* after sign-in the status module (status.js) owns this indicator */ const s = $("#sync"); s.classList.toggle("off", !ok); s.querySelector("span").textContent = text; };
 FR.setCount = (view, n) => { const el = $("#cnt-" + view); if (!el) return; el.textContent = n; el.hidden = false; };
 
 /* ---------- people helpers ---------- */

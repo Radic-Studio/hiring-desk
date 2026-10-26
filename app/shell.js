@@ -398,6 +398,7 @@ async function enter(session) {
   $("#gate").hidden = true; gateShow.stop();
   FR.paintRole(); setSync(true, "live");
   logAct("ok", `Signed in as ${S.me.name} (${roleLabel()}, ${FR.companyName(S.company)})`);
+  FR.statusStart?.();   // Live / Degraded / Offline and backup health
   FR.outboxStart?.();   // changes left on this device from an earlier session are sent now
   for (const m of Object.values(FR.modules)) m.start?.();
   loadMembers(); if (isGroupAdmin()) loadDeleted();

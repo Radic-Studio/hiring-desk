@@ -104,6 +104,23 @@ Every change to a business record goes through one database function, `apply_op(
 - Still written directly (by design): app settings, Press company settings, the customer name copied onto many jobs when a customer is renamed, files attached by customers in the portal, and the server functions (numbering, request to quote, portal request form). Customer messages in the portal use `apply_op`.
 - Resolving conflicts (Keep current / Take incoming / Edit and merge) is Stage 7; until then Group Admins can read open conflicts in the `conflicts` table.
 
+## Status: Live / Degraded / Offline, and backup health
+
+The indicator in the top bar (`app/status.js`) shows one of three states; click it for details.
+
+- **Live**: the database answers normally and live updates are connected.
+- **Degraded**: the database answers but something is off: server errors in the last 2 minutes, answers slower than about 4 seconds, live updates disconnected for more than 20 seconds, or changes on this device waiting to synchronize or refused.
+- **Offline**: the device has no internet, or the database cannot be reached. Changes that may wait are kept on the device; when the connection returns the status goes back to Live and waiting changes are sent.
+- It judges from the app's own database requests. It makes one small read of its own only when the app has been quiet for 2 minutes, or every 15 seconds while offline, and only while someone is signed in with the page open. It adds no background traffic and does nothing to keep the free project awake artificially.
+
+**Backup health (Group Admins only)**, read from `sync_runs`:
+- A **Backup late** or **Backup problem** chip appears next to the indicator when something needs attention.
+- The panel shows the newest backup (time, age, tables and rows), the last 6-hourly, nightly and month-end runs, and when the next 6-hourly (marked overdue if missed) and nightly (02:00–03:00 Lagos) are due.
+- Verdicts:
+  - **Late:** newest backup older than 8 hours, no 6-hourly run yet, a nightly older than 26 hours, or a run stuck for more than 30 minutes.
+  - **Problem:** no backup at all, newest backup older than 26 hours, or the latest scheduled attempt failed.
+  - Manual test runs that fail are ignored.
+
 ## Working through a dropped connection (device outbox)
 
 If the database cannot be reached, a change that is safe to send later is kept in the browser (IndexedDB, `app/outbox.js`) with its operation id. The person sees **"Saved on this device. Waiting to synchronize."**, never "Saved", and a **Waiting to sync** button with a count appears in the top bar.
