@@ -39,6 +39,8 @@ async function load(what = ["customers", "rates", "jobs", "payments", "materials
   scope(); render(); if (P.open && $("#drawer").classList.contains("open")) paintDrawer();
   if (P.reqOpen && $("#drawer").classList.contains("open")) openRequest(P.reqOpen, true);
 }
+// Jobs numbered DEMO-… are labelled test data for presentations; say so wherever totals include them.
+const demoNote = () => { const d = P.jobs.filter(j => FR.isDemo(j.number)); return d.length ? `<div class="banner info">These totals include ${d.length} DEMO job${d.length > 1 ? "s" : ""} (numbers starting DEMO-). Their amounts are test figures, not real business.</div>` : ""; };
 const paidOf = j => P.payments.filter(p => p.job_id === j.id).reduce((s, p) => s + N(p.amount), 0);
 const balanceOf = j => Math.max(0, N(j.total) - paidOf(j));
 const overdue = j => j.due_date && j.due_date < today() && !["delivered", "cancelled", "quote"].includes(j.stage);
@@ -77,6 +79,7 @@ function renderJobs() {
       <div class="tile" data-stage="owing"><span class="label">Balance owed</span><span class="value" style="font-size:22px">${money(P.jobs.filter(j => j.stage !== "quote" && j.stage !== "cancelled").reduce((s, j) => s + balanceOf(j), 0))}</span><span class="sub">across ${P.jobs.filter(j => j.stage !== "quote" && j.stage !== "cancelled" && balanceOf(j) > 0).length} jobs</span></div>
     </div>
     <div class="toolbar"><input type="search" id="pj-q" placeholder="Search number, title, customer…" value="${esc(P.q)}">${canWrite() ? `<button class="btn primary" id="pj-new" style="margin-left:auto">+ New quote</button>` : ""}</div>
+    ${demoNote()}
     ${P.rates.every(r => N(r.price) === 0) && canManage() ? `<div class="banner warn">The rate card has no prices yet. Set them on the Rate card page so quotes fill themselves in.</div>` : ""}
     <div class="board">${BOARD.map(st => { const col = open.filter(j => j.stage === st); return `<div class="bcol"><div class="bhead"><span>${STAGE_LABEL[st]}</span><span class="cnt">${col.length}</span></div>${col.sort((a, b) => (a.due_date || "9").localeCompare(b.due_date || "9")).map(jobCard).join("") || `<div class="bempty">—</div>`}</div>`; }).join("")}</div>
     ${closed.length ? `<div class="card"><h2>Delivered and cancelled <small>${closed.length}</small></h2><div class="table-wrap"><table><thead><tr><th>Number</th><th>Customer</th><th>Job</th><th>Stage</th><th>Total</th><th>Paid</th><th>When</th><th></th></tr></thead><tbody>${closed.slice(0, 100).map(j => `<tr data-open="${j.id}" style="cursor:pointer"><td>${esc(j.number)}</td><td>${esc(custName(j))}</td><td>${esc(j.title)}</td><td>${STAGE_LABEL[j.stage]}</td><td>${money(j.total)}</td><td>${money(paidOf(j))}</td><td>${when(j.delivered_at || j.updated_at)}</td><td><button class="btn small">Open</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
@@ -177,7 +180,7 @@ function renderMoney() {
   const recvMonth = P.payments.filter(p => (p.paid_at || "").startsWith(month)).reduce((s, p) => s + N(p.amount), 0);
   const deliveredMonth = P.jobs.filter(j => j.stage === "delivered" && (j.delivered_at || "").startsWith(month));
   const recent = P.payments.slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).slice(0, 25);
-  el.innerHTML = `<div class="tiles">
+  el.innerHTML = `${demoNote()}<div class="tiles">
       <div class="tile" style="cursor:default"><span class="label">Outstanding</span><span class="value" style="font-size:22px">${money(owing.reduce((s, j) => s + balanceOf(j), 0))}</span><span class="sub">${owing.length} job${owing.length === 1 ? "" : "s"} with a balance</span></div>
       <div class="tile" style="cursor:default"><span class="label">Received this month</span><span class="value" style="font-size:22px">${money(recvMonth)}</span><span class="sub">${P.payments.filter(p => (p.paid_at || "").startsWith(month)).length} receipts</span></div>
       <div class="tile" style="cursor:default"><span class="label">Delivered this month</span><span class="value">${deliveredMonth.length}</span><span class="sub">${money(deliveredMonth.reduce((s, j) => s + N(j.total), 0))} billed</span></div>

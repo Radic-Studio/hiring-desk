@@ -87,7 +87,7 @@ function render() {
   setCount("interview", Object.values(comp).filter(o => o.eligible).length);
   setCount("issues", Object.values(S.issues).filter(i => !i.resolved).length);
   setCount("history", allRoleIds().filter(r => roleOf(r).status === "closed").length);
-  $("#foot-stamp").textContent = S.loaded ? `${Object.keys(S.cands).length} candidates · ${roleIds().length} role${roleIds().length === 1 ? "" : "s"}` : "";
+  $("#foot-stamp").textContent = S.loaded ? `${Object.keys(S.cands).length} candidate${Object.keys(S.cands).length === 1 ? "" : "s"} ·${roleIds().length} role${roleIds().length === 1 ? "" : "s"}` : "";
   if (S.module !== "hiring") return;
   if (S.view === "dashboard") renderDashboard(comp);
   if (S.view === "candidates") renderCandidates(comp);
@@ -240,7 +240,7 @@ function renderDashboard(comp) {
   const nextUp = all.filter(c => (c.status || "pending") !== "contacted").sort((a, b) => (a.role === b.role ? comp[a.id].rank - comp[b.id].rank : ids.indexOf(a.role) - ids.indexOf(b.role))).slice(0, 8);
   if (!el.dataset.built) {
     el.dataset.built = "1";
-    el.innerHTML = `<div class="tiles" id="tiles"></div>
+    el.innerHTML = `<div class="banner info" id="demo-note" hidden></div><div class="tiles" id="tiles"></div>
     <div class="grid2">
       <div class="card"><h2>Next up <small>pre-call order</small></h2><ul class="nextup" id="nextup"></ul></div>
       <div class="card"><h2>Follow-ups due <small id="due-n"></small></h2><ul class="nextup" id="due"></ul></div>
@@ -267,6 +267,9 @@ function renderDashboard(comp) {
     ["avail", "Available now", avail, "said Immediately", ""], ["interview", "Second interview", elig, "meet the criteria", "accent"], ["issues", "Open issues", openIssues, "data to fix", ""]];
   if (!$("#tiles").children.length) $("#tiles").innerHTML = tiles.map(([k, l, v, s, cls]) => `<button class="tile ${cls}" data-tile="${k}"><span class="label">${l}</span><span class="value" data-v="0">0</span><span class="sub"></span>${k === "contacted" ? `<div class="progress"><i style="width:0%"></i></div>` : ""}</button>`).join("");
   tiles.forEach(([k, l, v, s]) => { const t = $(`[data-tile="${k}"]`); countUp(t.querySelector(".value"), v); t.querySelector(".sub").textContent = s; const p = t.querySelector(".progress i"); if (p) p.style.width = (n ? Math.round(contacted / n * 100) : 0) + "%"; });
+  const demoRoles = ids.filter(r => FR.isDemo(roleName(r)));   // clearly labelled test data for presentations
+  const dn = $("#demo-note"); dn.hidden = !demoRoles.length;
+  if (demoRoles.length) dn.textContent = `These figures include ${demoRoles.map(r => { const k = byRole(r).length; return `${k} test candidate${k === 1 ? "" : "s"} in "${roleName(r)}"`; }).join(" and ")}. They are DEMO records, not real applicants.`;
   $("#role-tiles").innerHTML = ids.map(r => { const rs = byRole(r), done = rs.filter(c => c.status === "contacted").length; return `<button class="chip" data-role="${esc(r)}">${esc(roleName(r))}<span class="cnt">${done}/${rs.length} contacted</span></button>`; }).join("") || `<span class="muted">No roles yet.</span>`;
   $("#nextup").innerHTML = nextUp.map(c => `<li data-id="${c.id}"><span class="rank">${comp[c.id].rank}</span><span><b>${esc(c.name)}</b><span class="sub muted"> · ${esc(roleName(c.role))} · ${esc(c.location || "Unknown")}</span></span>${pillStatus(c)}</li>`).join("") || `<li class="muted">${S.loaded ? "Everyone has been contacted." : "Loading…"}</li>`;
   $("#due-n").textContent = due.length ? `${due.length} today or overdue` : "";

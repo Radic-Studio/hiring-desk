@@ -79,7 +79,7 @@ Recorded locations (fill in after setup; IDs are not secrets, keys are never wri
 | Drive folder ID | `1YeNyM7ZF-RHFmTgxB7zEv-YJlxk3vhPJ` (also in `app_config.backup_drive_folder_id`) |
 | Spreadsheet ID | `1No3W-7ucMWB76HpWdbZhcwuGrDPplsfL5tk51q2tNrs` (also in `app_config.backup_sheet_id`) |
 
-Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`BACKUP_FIXTURE=/path/to/backup.json node apps-script/tests/backup.test.js`; the fixture is any backup file or the output of `select public.backup_export()`, kept outside the repository because it holds personal data). Last run 2026-10-26 on the 11:42 UTC backup: 16/16 pass.
+Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`BACKUP_FIXTURE=/path/to/backup.json node apps-script/tests/backup.test.js`; the fixture is any backup file or the output of `select public.backup_export()`, kept outside the repository because it holds personal data). Last run 2026-10-26 on the 12:58 UTC export: 16/16 pass.
 
 **Restoring.** Follow `docs/RESTORE_RUNBOOK.md`. It rebuilds into a new, empty project and never touches live. Passwords and files are not in database backups: people sign in with Google or use Forgot password.
 
@@ -126,6 +126,10 @@ The choice runs through `resolve_conflict` (migration `20261026_conflict_resolut
 - Every decision is logged in `ops_log` as action `resolve` with the choice, and the conflict keeps who resolved it, when and how.
 - **Private staff fields:** their values were never stored with conflicts, so Take incoming is switched off for them. Type the value or keep the current one.
 - **Deleted record:** restore it first, or Keep current.
+
+## Demo records
+
+Records whose name or number starts with `DEMO` (a Hiring role with 8 candidates and an issue, 2 staff with a leave request, a Press customer, 2 jobs numbered `DEMO-Q-…`, 2 materials) are labelled test data for the management demonstration, created by `docs/demo_seed.sql` through `apply_op`. They use fake phone numbers and `@example.com` addresses, no payments, and no real number sequence. Wherever dashboard totals include them, a banner says so (`FR.isDemo`). Remove them with the normal soft delete when management no longer needs them.
 
 ## Status: Live / Degraded / Offline, and backup health
 

@@ -76,6 +76,7 @@ FR.softDelete = async (table, id) => { const { data, error } = await FR.SB.rpc("
  * `base` is the record version this screen was showing; if someone else changed the same field since,
  * the database keeps their value, files ours as a conflict for a Group Admin, and says so. */
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+FR.isDemo = v => /^\s*DEMO\b/i.test(String(v || ""));   // records named or numbered DEMO… are presentation test data
 FR.uuid = uuid;
 const isNetErr = e => !e?.code && /fetch|network|load failed|timeout|aborted/i.test(e?.message || "");
 /**

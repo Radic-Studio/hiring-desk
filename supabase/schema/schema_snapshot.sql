@@ -1,6 +1,7 @@
 -- Future Ready Group System: complete database schema snapshot (structure only: no data, no secrets).
 
 -- Generated 2026-10-26 11:54 UTC from the live project by supabase/schema/generate_snapshot.sql.
+-- Updated 2026-10-26 13:00 UTC: apply_op now ignores generated columns (stage9 migration); its body matches live (md5 fae3f88f).
 
 -- Restore: run this whole file in the SQL editor of an EMPTY Supabase project, then load data with fr_restore() (see docs/RESTORE_RUNBOOK.md).
 
@@ -964,7 +965,7 @@ begin
     return jsonb_build_object('result', 'duplicate', 'first_result', rec.result, 'op_id', p_op_id, 'id', rec.record_id, 'version', rec.version, 'row', cur, 'message', 'This change was already received');
   end if;
 
-  select array_agg(column_name::text) into cols from information_schema.columns where table_schema = 'public' and table_name = p_entity;
+  select array_agg(column_name::text) into cols from information_schema.columns where table_schema = 'public' and table_name = p_entity and is_generated = 'NEVER';
   has_version := 'version' = any(cols);
   select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) into patch from jsonb_each(coalesce(p_patch, '{}'::jsonb)) where key = any(cols) and not (key = any(protected));
   begin

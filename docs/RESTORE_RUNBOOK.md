@@ -82,6 +82,23 @@ Not in the backup and **cannot be restored from it**:
    - Open `/press/` and check that the portal loads.
    - The status button should show **Live**. After the first backup, the backup line should show a fresh time.
 
+   - Relationships: run the check below in the new project. Every line must show 0 problems (live on 26 Oct 2026: all 0).
+   - Deletions: `select entity, label, deleted_at from deletions where restored_at is null and purged_at is null;` must match
+     Recently deleted at the time of the backup. Soft-deleted rows keep their `deleted_at`, and stock is not re-applied.
+   ```sql
+   select 'candidates with a missing role' as check_name, count(*) as problems from candidates c where not exists (select 1 from roles r where r.id = c.role)
+   union all select 'issues with a missing candidate', count(*) from issues i where i.candidate_id is not null and not exists (select 1 from candidates c where c.id = i.candidate_id)
+   union all select 'jobs with a missing customer', count(*) from press_jobs j where j.customer_id is not null and not exists (select 1 from press_customers c where c.id = j.customer_id)
+   union all select 'payments with a missing job', count(*) from press_payments p where not exists (select 1 from press_jobs j where j.id = p.job_id)
+   union all select 'leave with a missing staff record', count(*) from leave_requests l where not exists (select 1 from staff s where s.id = l.staff_id)
+   union all select 'request messages with a missing request', count(*) from customer_request_messages m where not exists (select 1 from customer_requests r where r.id = m.request_id)
+   union all select 'requests with a missing customer account', count(*) from customer_requests r where not exists (select 1 from auth.users u where u.id = r.user_id)
+   union all select 'company roles for a missing company', count(*) from company_members m where not exists (select 1 from companies c where c.id = m.company_id);
+   ```
+
+   **Production:** steps 6 and 7 switch the live system. Do them only with written management approval naming the backup
+   file and its time, after the steps before them and these checks have passed in the new project. Tell staff to stop entering data first.
+
 9. **Tell staff:** sign in with Google, or use *Forgot password* if you used an email and password. Any change a
    device was still holding offline is sent automatically once that person signs in again.
 
