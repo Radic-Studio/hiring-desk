@@ -16,14 +16,69 @@ html,body{height:100%}
 [hidden]{display:none!important}
 img{max-width:100%}
 /* sign-in */
-.gate{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50;padding:16px}
-.gate .card{max-width:440px;width:100%;text-align:center;display:grid;gap:14px;padding:28px}
-.gate .card.wide{max-width:560px;text-align:left}
-.gate .fields{text-align:left}
-.gate .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+/* sign-in gate: split card on a deep-green canvas; form left, company slideshow right (photo panel on top on phones) */
+.gate{position:fixed;inset:0;z-index:50;overflow:auto;padding:24px;display:grid;place-items:center;color-scheme:light;
+  background:#073F35;
+  background-image:radial-gradient(900px 500px at 8% 0%,rgba(13,122,98,.75),transparent 60%),radial-gradient(700px 500px at 100% 100%,rgba(13,122,98,.55),transparent 60%),
+    repeating-linear-gradient(115deg,transparent 0 22px,rgba(255,255,255,.035) 22px 23px);}
+.gate-wrap{width:100%;max-width:1120px;min-height:640px;background:var(--surface);border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);overflow:hidden}
+.gate-form{padding:44px 48px;display:flex;flex-direction:column;justify-content:center;gap:16px;min-width:0}
+.gate-form .lockup{width:190px;height:auto;margin-bottom:6px}
+.gate-form h1{font-family:var(--display);font-size:30px;line-height:1.15;margin:4px 0 0;letter-spacing:-.01em}
+.gate-form p{margin:0}
+.gate-form .muted{font-size:15px;line-height:1.5;max-width:40ch}
+.gate-form .fine{font-size:12px;color:var(--faint);margin-top:auto;padding-top:18px}
+.gate .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);max-width:360px}
+.gate .seg button{appearance:none;border:0;background:transparent;border-radius:9px;padding:10px 12px;font:600 14px var(--body);color:var(--muted);cursor:pointer;transition:background var(--base) var(--ease),color var(--base) var(--ease)}
+.gate .seg button.on{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
+.gate .seg button:focus-visible{outline:none;box-shadow:var(--accent-glow)}
+.gate .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;max-width:360px;padding:14px 18px;font-size:15px}
 .gate .gbtn svg{width:18px;height:18px}
-.gate .who{display:flex;align-items:center;gap:10px;justify-content:center;font-size:13px;color:var(--muted)}
+.gate .fields{text-align:left}
+.gate .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .gate .who .avatar{width:34px;height:34px}
+.gate .hint:empty{display:none}
+.gate-show{position:relative;margin:14px;border-radius:22px;overflow:hidden;min-height:300px;background:#0B5A48 radial-gradient(600px 400px at 70% 30%,rgba(255,255,255,.12),transparent 60%);isolation:isolate}
+.gate-show .slides{position:absolute;inset:0}
+.gate-show .slide{position:absolute;inset:0;opacity:0;transition:opacity 1.1s var(--ease);will-change:opacity}
+.gate-show .slide img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.04);transition:transform 8s linear}
+.gate-show .slide.on{opacity:1;z-index:1}
+.gate-show .slide.on img{transform:scale(1.12)}
+.gate-show .slide.press img{object-position:center 40%}
+.gate-show::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(to top,rgba(7,30,25,.82) 0%,rgba(7,30,25,.35) 38%,transparent 65%)}
+.gate-show .ad{position:absolute;top:18px;right:18px;z-index:3;width:250px;max-width:calc(100% - 36px);background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-radius:14px;padding:12px 14px 12px;display:grid;gap:4px;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:ad-in .6s var(--ease)}
+.gate-show .ad .chip{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--body);letter-spacing:.02em;text-transform:uppercase;color:var(--co-accent);width:max-content}
+.gate-show .ad .chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--co-accent)}
+.gate-show .ad b{font:600 14px/1.25 var(--display);color:var(--fg)}
+.gate-show .ad span:last-child{font-size:12px;line-height:1.4;color:var(--muted)}
+.gate-show .ad[data-co="events"]{--co-accent:var(--co-events)}
+.gate-show .ad[data-co="press"]{--co-accent:var(--co-press)}
+.gate-show .cap{position:absolute;left:22px;right:22px;bottom:64px;z-index:3;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.4);animation:cap-in .7s var(--ease)}
+.gate-show .cap h2{font:600 26px/1.15 var(--display);margin:0 0 10px;letter-spacing:-.01em;max-width:18ch}
+.gate-show .cap .pill{display:inline-block;font:500 12px var(--body);padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);text-shadow:none;backdrop-filter:blur(4px)}
+.gate-show .ctl{position:absolute;left:22px;right:22px;bottom:18px;z-index:3;display:flex;align-items:center;gap:8px}
+.gate-show .ctl button{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:16px;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(4px);transition:background var(--fast)}
+.gate-show .ctl button:hover{background:rgba(255,255,255,.3)}
+.gate-show .ctl .dots{margin-left:auto;display:flex;gap:5px}
+.gate-show .ctl .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);transition:width var(--base) var(--ease),background var(--base)}
+.gate-show .ctl .dots i.on{width:18px;border-radius:3px;background:#fff}
+@keyframes ad-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes cap-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (max-width:900px){
+  .gate{padding:12px;place-items:start center}
+  .gate-wrap{grid-template-columns:1fr;min-height:0;border-radius:22px}
+  .gate-show{order:-1;margin:10px;min-height:290px;height:62vw;max-height:360px;border-radius:16px}
+  .gate-show .cap{bottom:54px;left:16px;right:16px}
+  .gate-show .cap h2{font-size:20px;max-width:none}
+  .gate-show .ad{top:12px;left:12px;right:12px;width:auto;max-width:none;padding:8px 12px;grid-template-columns:auto 1fr;align-items:center;column-gap:10px}
+  .gate-show .ad span:last-child{display:none}
+  .gate-show .ad b{font-size:13px}
+  .gate-show .ctl{left:16px;right:16px;bottom:14px}
+  .gate-form{padding:22px 22px 26px;gap:14px}
+  .gate-form h1{font-size:24px}
+  .gate .seg,.gate .gbtn{max-width:none}
+}
+@media (prefers-reduced-motion: reduce){.gate-show .slide img,.gate-show .slide.on img{transform:none}}
 .pf-photo{display:flex;align-items:center;gap:14px}
 .pf-photo .avatar{width:64px;height:64px;font-size:20px}
 .pf-photo .hint{margin:0}
@@ -38,7 +93,6 @@ img{max-width:100%}
 .member.me-row{border-color:var(--accent-line);background:var(--accent-soft)}
 .member.off{opacity:.6}
 @media (max-width:640px){.member{grid-template-columns:auto 1fr}.member .acts{grid-column:1/-1;justify-content:flex-start}}
-.gate .mark{width:48px;height:48px;border-radius:12px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--display);font-weight:800;margin:0 auto;box-shadow:0 6px 18px rgba(47,91,255,.35)}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.5}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -364,8 +418,6 @@ main .view{min-width:0}
 .brand{padding:6px 8px 16px}
 .brand img.lockup{width:168px;height:auto;display:block}
 .brand .mark{display:none}
-.gate .logo{width:200px;height:auto;margin:0 auto;display:block}
-.gate .mark{display:none}
 .co-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--co-soft);color:var(--co-accent);border:1px solid color-mix(in srgb,var(--co-accent) 35%,transparent)}
 .co-badge img{width:14px;height:14px}
 body[data-company="press"]{--co-accent:var(--co-press);--co-soft:var(--co-press-soft)}

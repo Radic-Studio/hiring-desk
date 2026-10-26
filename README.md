@@ -59,4 +59,8 @@ Edit `index.html`, commit, push. Netlify deploys in under a minute. Database cha
 
 Visual rules come from the Future Ready Brand System v2 (`app/brand/BRAND_GUIDELINES.pdf`, tokens in `app/brand/design_tokens.json`). Future Green is the only action colour; Press Blue and Events Coral mark company context (switcher, header badge, PDF lockup) and never success or error. Logos are the supplied SVG masters; the wordmark is outlined artwork and is not typeset. Fonts: Sora (display), IBM Plex Sans (body), IBM Plex Mono (numbers).
 
+### Sign-in page
+
+Split card on a deep-green canvas: form on the left (lockup, Sign in / Request access toggle, one Google button), a company showcase on the right that cross-fades through twelve photos with a floating promo card and caption (`GATE_SLIDES` in `app/shell.js`). On phones the showcase sits above the form. The photos are Unsplash photographs under the Unsplash Licence (free for commercial use, no attribution required; the photographer is still named in the caption) and are served from Unsplash's CDN at 800/1400 px. To replace them with Future Ready's own photography, put JPEGs in `app/brand/photos/` and change the `img()` helper in `gateShow` to point at them. If every image fails to load, the panel falls back to the brand gradient and the controls hide.
+
 Not yet implemented from the behaviour spec (`06_UI_UX/UI_UX_BEHAVIOR_SPEC.md` in the kit): collapsible 80 px sidebar at 900–1119 px, dirty-form guard on company switch and drawer close, typed-name confirmation for permanent role deletion, drag-and-drop on the Press board, "Closed" stage after Delivered, table-to-card conversion for People and Press tables under 720 px, skeleton loading states.

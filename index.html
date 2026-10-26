@@ -7,10 +7,28 @@
 <link rel="icon" type="image/svg+xml" href="./app/brand/app_icon.svg">
 <script src="./config.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="./app/styles.css?v=4">
+<link rel="stylesheet" href="./app/styles.css?v=5">
 </head>
 <body>
-<div class="gate" id="gate" hidden><div class="card" id="gate-card"><img class="logo" src="./app/brand/lockup_vertical_primary.svg" alt="Future Ready" width="200"><div class="mark">FR</div><h1 id="gate-title">Group system</h1><p class="muted" id="gate-msg">Sign in with your Google account. New here? The same button creates your account; an Admin then approves it.</p><div id="gate-body"><button class="btn primary gbtn" id="gate-google"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#fff" opacity=".8" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fff" opacity=".6" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#fff" opacity=".9" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></svg>Continue with Google</button></div><p class="hint" id="gate-note"></p></div></div>
+<div class="gate" id="gate" hidden>
+  <div class="gate-wrap">
+    <section class="gate-form" id="gate-card">
+      <img class="lockup" src="./app/brand/lockup_horizontal_primary.svg" alt="Future Ready" width="190">
+      <div class="seg" id="gate-seg" role="tablist" aria-label="Sign in or request access"><button type="button" class="on" data-mode="in" role="tab" aria-selected="true">Sign in</button><button type="button" data-mode="req" role="tab" aria-selected="false">Request access</button></div>
+      <h1 id="gate-title">Welcome back</h1>
+      <p class="muted" id="gate-msg">One account for every Future Ready company. Use the Google account your Admin knows.</p>
+      <div id="gate-body"><button class="btn primary gbtn" id="gate-google"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#fff" opacity=".8" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fff" opacity=".6" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#fff" opacity=".9" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></svg>Continue with Google</button></div>
+      <p class="hint" id="gate-note"></p>
+      <p class="fine">Future Ready Nig. Ltd · Events · Press · Enugu, Nigeria</p>
+    </section>
+    <aside class="gate-show" id="gate-show" aria-label="Future Ready companies">
+      <div class="slides" id="gate-slides"></div>
+      <div class="ad" id="gate-ad" hidden><span class="chip" id="gate-ad-chip"></span><b id="gate-ad-h"></b><span id="gate-ad-p"></span></div>
+      <div class="cap" id="gate-cap" hidden><h2 id="gate-cap-h"></h2><span class="pill" id="gate-cap-pill"></span></div>
+      <div class="ctl" id="gate-ctl" hidden><button type="button" id="gate-prev" aria-label="Previous">&larr;</button><button type="button" id="gate-next" aria-label="Next">&rarr;</button><span class="dots" id="gate-dots"></span></div>
+    </aside>
+  </div>
+</div>
 <div class="app">
 <aside class="side">
   <div class="brand"><img class="lockup" src="./app/brand/lockup_horizontal_primary.svg" alt="Future Ready" width="168" height="39"><div class="mark">FR</div></div>
@@ -62,11 +80,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="./app/brand/logos.js?v=4"></script>
-<script src="./app/core.js?v=4"></script>
-<script src="./app/modules/hiring.js?v=4"></script>
-<script src="./app/modules/people.js?v=4"></script>
-<script src="./app/modules/press.js?v=4"></script>
-<script src="./app/shell.js?v=4"></script>
+<script src="./app/brand/logos.js?v=5"></script>
+<script src="./app/core.js?v=5"></script>
+<script src="./app/modules/hiring.js?v=5"></script>
+<script src="./app/modules/people.js?v=5"></script>
+<script src="./app/modules/press.js?v=5"></script>
+<script src="./app/shell.js?v=5"></script>
 </body>
 </html>

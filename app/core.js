@@ -13,6 +13,7 @@ const S = FR.S = {
 };
 
 const $ = FR.$ = (s, el = document) => el.querySelector(s);
+const $$ = FR.$$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 const esc = FR.esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 FR.safeGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 FR.safeSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };

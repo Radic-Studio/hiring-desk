@@ -2,7 +2,7 @@
    Modules (app/modules/*.js) register themselves on FR before boot() runs. */
 (() => {
 const FR = window.FR, S = FR.S, CFG = FR.CFG;
-const { $, esc, toast, logAct, notice, setSync, safeGet, safeSet, when, memberName, avatarHtml, callFunction, LEVEL_LABEL, ROLE_LABEL, ROLE_HELP } = FR;
+const { $, $$, esc, toast, logAct, notice, setSync, safeGet, safeSet, when, memberName, avatarHtml, callFunction, LEVEL_LABEL, ROLE_LABEL, ROLE_HELP } = FR;
 const SB = () => FR.SB;
 
 /* ---------- access helpers ---------- */
@@ -134,7 +134,70 @@ $("#me-mobile").addEventListener("click", () => { if (S.me) openProfile(false); 
 document.addEventListener("click", e => { if (!e.target.closest(".foot") && !$("#pop").hidden) togglePop(false); });
 
 /* ---------- gate: sign-in, sign-up, pending, disabled ---------- */
-function showGate(msg, note) { $("#gate").hidden = false; if (msg) $("#gate-msg").textContent = msg; $("#gate-note").textContent = note || ""; }
+function showGate(msg, note) { $("#gate").hidden = false; if (msg) $("#gate-msg").textContent = msg; $("#gate-note").textContent = note || ""; gateShow.start(); }
+const GATE_COPY = {
+  in: { title: "Welcome back", msg: "One account for every Future Ready company. Use the Google account your Admin knows.", btn: "Continue with Google" },
+  req: { title: "Join the team", msg: "New here? Sign in with Google, tell us your company and the access you need, and an Admin approves it. It takes a minute.", btn: "Start with Google" },
+};
+function gateMode(mode) {
+  const c = GATE_COPY[mode] || GATE_COPY.in;
+  $("#gate-title").textContent = c.title; $("#gate-msg").textContent = c.msg;
+  const b = $("#gate-google"); if (b) b.lastChild.textContent = c.btn;
+  $$("#gate-seg button").forEach(x => { const on = x.dataset.mode === mode; x.classList.toggle("on", on); x.setAttribute("aria-selected", on ? "true" : "false"); });
+}
+/* ---------- gate slideshow: what the companies do. Photos: Unsplash, free licence (commercial use allowed), served from their CDN. ---------- */
+const GATE_SLIDES = [
+  { co: "events", f: "flagged/photo-1578905325074-a07c98c5cfd5", by: "Samson Ejim", h: "Traditional marriages, done properly", adH: "Planning a traditional marriage?", adP: "Venue, canopy, décor, catering and the running order, handled end to end." },
+  { co: "press", f: "photo-1624698971296-b8b01fd1aab9", by: "Omid Roshan", h: "Offset and digital printing under one roof", adH: "Need it printed this week?", adP: "Programmes, flyers, banners and souvenirs with fast turnaround." },
+  { co: "events", f: "photo-1661332306744-70f9ed1a7f40", by: "Tope A. Asokere", h: "Weddings that look like you", adH: "White wedding or traditional?", adP: "We plan both, from the first meeting to the last dance." },
+  { co: "press", f: "photo-1581079289196-67865ea83118", by: "Mika Baumeister", h: "Your brand colours, exactly", adH: "Colour-matched printing", adP: "Business cards, letterheads and packaging that match your brand." },
+  { co: "events", f: "photo-1742445972540-2f64de4eb4f3", by: "Mexsss", h: "Every detail, on time", adH: "Event coordination", adP: "Timelines, vendors and guests managed so the couple only has to show up." },
+  { co: "press", f: "photo-1676474508989-40ddb421e426", by: "Fancy Walls", h: "Banners and large format", adH: "Large-format printing", adP: "Roll-up banners, backdrops, posters and signage for any event or shop." },
+  { co: "events", f: "photo-1779308936221-89739e035a53", by: "Simply Thrilled", h: "Stage, drapes and lighting", adH: "Reception décor", adP: "Stage design, draping and lighting that photograph well." },
+  { co: "press", f: "photo-1503694978374-8a2fa686963a", by: "Bank Phrom", h: "Printing at scale", adH: "Bulk printing", adP: "Newsletters, booklets and campaign materials in volume." },
+  { co: "events", f: "photo-1769812343590-485512e27838", by: "Jonathan Borba", h: "Table settings and décor", adH: "Décor and styling", adP: "Table settings, florals and centrepieces to match your theme." },
+  { co: "press", f: "photo-1791220154642-aeddbc273852", by: "Brecht Corbeel", h: "Business cards to souvenirs", adH: "Personalised items", adP: "Jotters, mugs, bags and gift items branded for your occasion." },
+  { co: "events", f: "photo-1665944017732-278d6811da07", by: "Chizzyen Shaded", h: "Engagements and introductions", adH: "Small ceremonies too", adP: "Introductions, engagements and private dinners, planned with care." },
+  { co: "events", f: "photo-1786426923263-61e9699bfc39", by: "Anik Das", h: "Marquees and canopies", adH: "Outdoor events", adP: "Marquees, canopies, chairs and cooling for open-air functions." },
+];
+const GATE_CO = { events: "Future Ready Events", press: "Future Ready Press" };
+const gateShow = (() => {
+  let i = -1, timer = null, built = new Set(), dead = new Set(), slides, dots;
+  const img = (f, w) => `https://images.unsplash.com/${f}?auto=format&fit=crop&w=${w}&q=72`;
+  const alive = () => GATE_SLIDES.map((_, k) => k).filter(k => !dead.has(k));
+  function build(k) {
+    if (built.has(k)) return; built.add(k);
+    const sd = GATE_SLIDES[k], el = document.createElement("div"); el.className = "slide " + sd.co; el.dataset.k = k;
+    const im = new Image(); im.alt = ""; im.decoding = "async"; im.src = img(sd.f, 1400); im.srcset = `${img(sd.f, 800)} 800w, ${img(sd.f, 1400)} 1400w`; im.sizes = "(max-width:900px) 100vw, 620px";
+    im.onerror = () => { dead.add(k); el.remove(); if (dead.size >= GATE_SLIDES.length) { $("#gate-ad").hidden = $("#gate-cap").hidden = $("#gate-ctl").hidden = true; stop(); } else if (+el.dataset.k === i) show(1); };
+    el.appendChild(im); slides.appendChild(el);
+  }
+  function paint(k) {
+    const sd = GATE_SLIDES[k];
+    const ad = $("#gate-ad"); ad.hidden = false; ad.dataset.co = sd.co; $("#gate-ad-chip").textContent = GATE_CO[sd.co]; $("#gate-ad-h").textContent = sd.adH; $("#gate-ad-p").textContent = sd.adP;
+    ad.style.animation = "none"; void ad.offsetWidth; ad.style.animation = "";
+    const cap = $("#gate-cap"); cap.hidden = false; $("#gate-cap-h").textContent = sd.h; $("#gate-cap-pill").textContent = `${GATE_CO[sd.co]} · Photo: ${sd.by}`;
+    cap.style.animation = "none"; void cap.offsetWidth; cap.style.animation = "";
+    $("#gate-ctl").hidden = false;
+    const live = alive(); dots.innerHTML = live.map(x => `<i class="${x === k ? "on" : ""}"></i>`).join("");
+  }
+  function show(step) {
+    const live = alive(); if (!live.length) return;
+    const pos = live.indexOf(i), k = live[((pos < 0 ? 0 : pos + step) + live.length) % live.length];
+    build(k); const nxt = live[(live.indexOf(k) + 1) % live.length]; if (nxt !== k) build(nxt);
+    i = k; $$("#gate-slides .slide").forEach(el => el.classList.toggle("on", +el.dataset.k === k)); paint(k);
+  }
+  function tick() { if ($("#gate").hidden || document.hidden) return; show(1); }
+  function start() { if (!slides) init(); if (timer) return; if (i < 0) show(1); timer = setInterval(tick, 6500); }
+  function stop() { clearInterval(timer); timer = null; }
+  function init() {
+    slides = $("#gate-slides"); dots = $("#gate-dots"); if (!slides) return;
+    $("#gate-prev").onclick = () => { show(-1); restart(); }; $("#gate-next").onclick = () => { show(1); restart(); };
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && timer) tick(); });
+  }
+  function restart() { if (timer) { stop(); start(); } }
+  return { start, stop };
+})();
 function googleProfile(session) {
   const u = session?.user?.user_metadata || {};
   const name = u.full_name || u.name || "";
@@ -144,7 +207,7 @@ function googleProfile(session) {
 function gateState(state, d = {}) {
   const card = $("#gate-card"), title = $("#gate-title"), msg = $("#gate-msg"), body = $("#gate-body"), note = $("#gate-note");
   card.classList.toggle("wide", state === "signup");
-  $("#gate").hidden = false; note.textContent = "";
+  $("#gate").hidden = false; note.textContent = ""; $("#gate-seg").hidden = true; gateShow.start();
   const signout = `<button class="btn small" id="gate-out">Sign out</button>`;
   if (state === "invited") { title.textContent = "You have been invited"; msg.textContent = "Sign in with the Google account that received the invitation email. Your account is ready; you will only be asked for your details."; return; }
   if (state === "signup") {
@@ -184,6 +247,8 @@ function gateState(state, d = {}) {
 /* ---------- boot ---------- */
 async function boot() {
   $("#foot-sheet").href = CFG.sheetUrl || "#";
+  $$("#gate-seg button").forEach(b => b.onclick = () => gateMode(b.dataset.mode));
+  gateMode("in");
   if (!CFG.supabaseUrl || !CFG.supabaseKey || !window.supabase) { showGate("This copy is not configured.", "config.js must set supabaseUrl and supabaseKey."); setSync(false, "not configured"); return; }
   FR.SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
   const inv = new URLSearchParams(location.search).get("invite");
@@ -222,7 +287,7 @@ async function enter(session) {
   const r = routeFromHash();
   S.company = (r.company && roleIn(r.company) && S.companies.some(c => c.id === r.company && c.active)) ? r.company : defaultCompany();
   safeSet("fr_company", S.company); applyCompanyAccess(); buildNav();
-  $("#gate").hidden = true;
+  $("#gate").hidden = true; gateShow.stop();
   FR.paintRole(); setSync(true, "live");
   logAct("ok", `Signed in as ${S.me.name} (${roleLabel()}, ${FR.companyName(S.company)})`);
   for (const m of Object.values(FR.modules)) m.start?.();
