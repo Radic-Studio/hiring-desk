@@ -15,7 +15,7 @@ FIX2.tables.staff = [{ id: "s1", company_id: "press", full_name: "Test Person", 
 FIX2.row_counts.staff = 1; FIX2.total_rows += 1;
 FIX2.tables.candidates[0] = { ...FIX2.tables.candidates[0], notes: "=HYPERLINK(\"http://evil\",\"x\")", history: [{ big: "x".repeat(60000) }] };
 
-test("T1 setup creates folders, spreadsheet, triggers, records location, first backup succeeds", "Folder tree as approved; 2 triggers (6-hourly, 02:00 daily); app_config has 4 backup keys; one nightly file; sync_runs success with 26 tables / 170 rows", () => {
+test("T1 setup creates folders, spreadsheet, triggers, records location, first backup succeeds", "Folder tree as approved; 2 triggers (6-hourly, 02:00 daily); app_config has 4 backup keys; one nightly file; sync_runs success with the fixture's table and row counts", () => {
   const S = makeEnv({ now: "2026-10-26T08:00:00Z" });
   const r = S.ctx.setup();
   const tree = S.folders.filter(x => x.f.parent).map(x => S.path(x.f) + "/" + x.f.name).sort();
@@ -23,7 +23,7 @@ test("T1 setup creates folders, spreadsheet, triggers, records location, first b
   const trig = S.triggers.map(t => t.h + JSON.stringify(t.spec)).sort();
   const files = S.live().map(x => x.path);
   const run = S.runs[0];
-  const pass = JSON.stringify(tree) === JSON.stringify(want) && trig.length === 2 && trig.some(t => t.startsWith('runRolling') && t.includes('"everyHours":6')) && trig.some(t => t.startsWith('runNightly') && t.includes('"atHour":2')) && Object.keys(S.appConfig).length === 4 && files.length === 1 && files[0].includes("/database/nightly/future-ready-db-2026-10-26T080000Z.json") && run.status === "success" && run.tables === 26 && run.rows === 170;
+  const pass = JSON.stringify(tree) === JSON.stringify(want) && trig.length === 2 && trig.some(t => t.startsWith('runRolling') && t.includes('"everyHours":6')) && trig.some(t => t.startsWith('runNightly') && t.includes('"atHour":2')) && Object.keys(S.appConfig).length === 4 && files.length === 1 && files[0].includes("/database/nightly/future-ready-db-2026-10-26T080000Z.json") && run.status === "success" && run.tables === FIX.table_list.length && run.rows === FIX.total_rows;
   return { pass, actual: `tree ${tree.length} folders ok=${JSON.stringify(tree) === JSON.stringify(want)}; triggers ${trig.join(", ")}; app_config keys ${Object.keys(S.appConfig).join(",")}; files ${files.join(", ")}; run ${run.status} ${run.tables}/${run.rows}`, evidence: "setup() return: " + JSON.stringify({ first: { ok: r.first.ok, fileName: r.first.fileName } }) };
 });
 
@@ -33,7 +33,7 @@ test("T2 backup file carries the approved metadata and a checksum that verifies 
   const need = ["generated_at", "project", "schema_version", "table_list", "row_counts", "total_rows", "backup_format", "status", "checksum_sha256"];
   const missing = need.filter(k => !(k in j));
   const recomputed = sha(JSON.stringify(j.tables));
-  const countsOk = j.table_list.every(t => j.tables[t].length === j.row_counts[t]) && j.total_rows === 170;
+  const countsOk = j.table_list.every(t => j.tables[t].length === j.row_counts[t]) && j.total_rows === FIX.total_rows;
   return { pass: r.ok && !missing.length && recomputed === j.checksum_sha256 && countsOk && j.status === "complete", actual: `missing ${JSON.stringify(missing)}; checksum ${j.checksum_sha256.slice(0, 16)}… recomputed ${recomputed.slice(0, 16)}…; counts ok ${countsOk}; file ${f.path}`, evidence: "keys: " + Object.keys(j).join(", ") };
 });
 

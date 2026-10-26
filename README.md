@@ -18,7 +18,10 @@ It runs on **Supabase** (database, Google sign-in, functions) and is hosted on *
 | `app/brand/` | Brand assets: master and sub-brand lockups/symbols/app icons (SVG masters, never redrawn), icon sprite, email banners, `logos.js` (rasterised lockups for PDF letterheads), `BRAND_GUIDELINES.pdf`. |
 | `config.js` | Publishable settings: Supabase URL and publishable key, form link, sheet link. No secrets. |
 | `netlify.toml` | Static publish config and security headers. |
-| `supabase/migrations/*.sql` | Database schema, row-level security, defaults. Already applied to the project. |
+| `supabase/migrations/*.sql` | The history of database changes, each already applied to the live project. A record, not a rebuild path: replaying them gives an older version of several security checks. |
+| `supabase/schema/schema_snapshot.sql` | The authoritative definition of the live database (tables, functions, access rules, triggers, storage buckets), generated from live by `generate_snapshot.sql`. Regenerate and commit it after every database change. |
+| `supabase/schema/restore_function.sql` | `fr_restore()`: loads a backup file into an empty project. Install only in the project being restored into. |
+| `docs/RESTORE_RUNBOOK.md` | Step-by-step rebuild of the database from a backup, tested 2026-10-26. |
 | `supabase/functions/send-doc/index.ts` | Edge function: emails a company document (quote, invoice, receipt) with a PDF attachment through the Gmail relay; caller must have write access to the company. |
 | `supabase/functions/invite-member/index.ts` | Edge function behind the Team page's Send invitation button: records the invitation (as the caller, so the database checks they are an Admin) and emails the personal link through the relay. Already deployed. |
 | `supabase/functions/send-email/index.ts` | Edge function that checks the sender and candidate, then relays the email to the Apps Script, which sends it from Gmail. Already deployed. |
@@ -76,7 +79,9 @@ Recorded locations (fill in after setup; IDs are not secrets, keys are never wri
 | Drive folder ID | `1YeNyM7ZF-RHFmTgxB7zEv-YJlxk3vhPJ` (also in `app_config.backup_drive_folder_id`) |
 | Spreadsheet ID | `1No3W-7ucMWB76HpWdbZhcwuGrDPplsfL5tk51q2tNrs` (also in `app_config.backup_sheet_id`) |
 
-Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`node apps-script/tests/backup.test.js`, needs a `fixture_export.json` produced by `select public.backup_export()`, which is not committed because it holds personal data).
+Tests: `apps-script/tests/` runs `Backup.gs` unchanged against simulated Drive, Sheets, Mail, triggers and Supabase (`BACKUP_FIXTURE=/path/to/backup.json node apps-script/tests/backup.test.js`; the fixture is any backup file or the output of `select public.backup_export()`, kept outside the repository because it holds personal data). Last run 2026-10-26 on the 11:42 UTC backup: 16/16 pass.
+
+**Restoring.** Follow `docs/RESTORE_RUNBOOK.md`. It rebuilds into a new, empty project and never touches live. Passwords and files are not in database backups: people sign in with Google or use Forgot password.
 
 **Free-plan pausing.** Supabase pauses a Free project after 7 days without activity. While paused the app and portal cannot load data; data is kept. To restore: Supabase dashboard → the project → **Restore project** (takes a few minutes), then reload the app. No artificial traffic is generated to avoid pausing; the backup job reads the database every 6 hours as part of its real work.
 
@@ -128,6 +133,7 @@ The indicator in the top bar (`app/status.js`) shows one of three states; click 
 
 - **Live**: the database answers normally and live updates are connected.
 - **Degraded**: the database answers but something is off: server errors in the last 2 minutes, answers slower than about 4 seconds, live updates disconnected for more than 20 seconds, or changes on this device waiting to synchronize or refused.
+- **Sign-in service trouble** counts as Degraded, not Offline: people already signed in keep working, and the sign-in page says the service is not answering instead of showing a raw error.
 - **Offline**: the device has no internet, or the database cannot be reached. Changes that may wait are kept on the device; when the connection returns the status goes back to Live and waiting changes are sent.
 - It judges from the app's own database requests. It makes one small read of its own only when the app has been quiet for 2 minutes, or every 15 seconds while offline, and only while someone is signed in with the page open. It adds no background traffic and does nothing to keep the free project awake artificially.
 

@@ -16,6 +16,8 @@ function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = fal
 const newId = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
 function authErr(e) {
   const m = String(e?.message || e || "");
+  if (e?.name === "AuthRetryableFetchError" || (e?.status >= 500) || /failed to fetch|networkerror|load failed|^\{\}$/i.test(m))
+    return navigator.onLine === false ? "This device is offline. Connect to the internet, then try again." : "The sign-in service is not answering right now. Wait a minute, then try again.";
   if (/invalid login credentials/i.test(m)) return "Wrong email or password.";
   if (/email not confirmed/i.test(m)) return "Confirm your email first: open the message we sent you, then sign in.";
   if (/already registered|already been registered/i.test(m)) return "That email already has an account. Sign in, or use Forgot password.";

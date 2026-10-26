@@ -1,6 +1,6 @@
 -- Future Ready Group System: complete database schema snapshot (structure only: no data, no secrets).
 
--- Generated 2026-10-26 09:58 UTC from the live project by supabase/schema/generate_snapshot.sql.
+-- Generated 2026-10-26 11:54 UTC from the live project by supabase/schema/generate_snapshot.sql.
 
 -- Restore: run this whole file in the SQL editor of an EMPTY Supabase project, then load data with fr_restore() (see docs/RESTORE_RUNBOOK.md).
 
@@ -1629,7 +1629,10 @@ begin
   end if;
   new.op_id := coalesce(op::uuid, gen_random_uuid());
   new.updated_at := now();
-  new.updated_by := coalesce(nullif(me, ''), new.updated_by, case when tg_op = 'UPDATE' then old.updated_by end, 'service');
+  if me <> '' then new.updated_by := me;
+  elsif tg_op = 'INSERT' then new.updated_by := coalesce(nullif(new.updated_by, ''), 'service');
+  elsif new.updated_by is not distinct from old.updated_by then new.updated_by := 'service';
+  end if;
   return new;
 end $function$
 ;
@@ -1948,9 +1951,9 @@ alter publication supabase_realtime add table public.sync_runs;
 
 -- storage buckets (files themselves are not in database backups)
 
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('avatars', 'avatars', t, 2097152, '{image/jpeg,image/png,image/webp}'::text[]) on conflict (id) do nothing;
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('customer-files', 'customer-files', f, 26214400, '{image/png,image/jpeg,image/webp,image/svg+xml,application/pdf,application/postscript,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/plain}'::text[]) on conflict (id) do nothing;
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('press-files', 'press-files', f, 26214400, null) on conflict (id) do nothing;
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('staff-docs', 'staff-docs', f, 10485760, '{application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document}'::text[]) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('avatars', 'avatars', true, 2097152, '{image/jpeg,image/png,image/webp}'::text[]) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('customer-files', 'customer-files', false, 26214400, '{image/png,image/jpeg,image/webp,image/svg+xml,application/pdf,application/postscript,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/plain}'::text[]) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('press-files', 'press-files', false, 26214400, null) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('staff-docs', 'staff-docs', false, 10485760, '{application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document}'::text[]) on conflict (id) do nothing;
 
 reset check_function_bodies;

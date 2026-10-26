@@ -14,7 +14,7 @@ const BASE = (FR.CFG.supabaseUrl || "").replace(/\/$/, "");
 const SLOW_MS = 4000, ERR_WINDOW = 120000, IDLE_PROBE = 120000, RT_GRACE = 20000;
 const BACKUP_WARN_H = 8, NIGHTLY_WARN_H = 26, ROLLING_EVERY_H = 6, NIGHTLY_HOUR = 2;   // matches apps-script/Backup.gs
 
-const st = FR.ST = { lastOk: 0, lastNetFail: 0, netFails: 0, serverErrs: [], lat: [], rtDownSince: 0, state: "connecting", reasons: [], started: false, probing: false, backup: null, backupErr: "" };
+const st = FR.ST = { lastOk: 0, lastNetFail: 0, netFails: 0, serverErrs: [], authErrs: [], lat: [], rtDownSince: 0, state: "connecting", reasons: [], started: false, probing: false, backup: null, backupErr: "" };
 
 /* ---------- watch the app's own database traffic ---------- */
 const realFetch = window.fetch.bind(window);
@@ -22,6 +22,13 @@ window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input?.url || "";
   if (!BASE || !url.startsWith(BASE) || url.includes("/realtime/")) return realFetch(input, init);
   const t0 = performance.now();
+  if (url.includes("/auth/v1/")) {   // sign-in service: tracked on its own, so a sign-in outage is not reported as the database being down
+    try {
+      const res = await realFetch(input, init);
+      if (res.status >= 500) st.authErrs.push(Date.now()); else st.authErrs = [];
+      schedule(); return res;
+    } catch (e) { if (e?.name !== "AbortError") { st.authErrs.push(Date.now()); schedule(); } throw e; }
+  }
   try {
     const res = await realFetch(input, init);
     const ms = performance.now() - t0;
@@ -39,6 +46,7 @@ const median = a => { if (!a.length) return 0; const s = [...a].sort((x, y) => x
 async function compute() {
   const now = Date.now(), r = [];
   st.serverErrs = st.serverErrs.filter(t => now - t < ERR_WINDOW);
+  st.authErrs = st.authErrs.filter(t => now - t < ERR_WINDOW);
   const rt = FR.SB?.realtime, channels = (rt?.channels || rt?.getChannels?.() || []).length;
   const rtUp = !channels || (rt?.isConnected ? rt.isConnected() : true);
   if (rtUp) st.rtDownSince = 0; else if (!st.rtDownSince) st.rtDownSince = now;
@@ -48,6 +56,7 @@ async function compute() {
   else {
     if (st.serverErrs.length) r.push(`The database returned ${st.serverErrs.length} error${st.serverErrs.length > 1 ? "s" : ""} in the last 2 minutes.`);
     if (st.lat.length >= 3 && median(st.lat) > SLOW_MS) r.push(`The database is answering slowly (about ${Math.round(median(st.lat) / 1000)} s).`);
+    if (st.authErrs.length) r.push("The sign-in service is having problems. If you are signed in you can keep working; signing in, or staying signed in after about an hour, may fail until it recovers.");
     if (st.rtDownSince && now - st.rtDownSince > RT_GRACE) r.push("Live updates are disconnected: other people's changes appear after a refresh.");
     if (r.length) state = "degraded";
   }

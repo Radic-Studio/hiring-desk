@@ -67,7 +67,7 @@ pub as (
   from pg_publication_tables where pubname = 'supabase_realtime'),
 bkt as (
   select string_agg(format('insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values (%L, %L, %s, %s, %s) on conflict (id) do nothing;',
-           id, name, public, coalesce(file_size_limit::text, 'null'), coalesce(quote_literal(allowed_mime_types::text) || '::text[]', 'null')), E'\n' order by id) t
+           id, name, public::text, coalesce(file_size_limit::text, 'null'), coalesce(quote_literal(allowed_mime_types::text) || '::text[]', 'null')), E'\n' order by id) t
   from storage.buckets)
 select concat_ws(E'\n\n',
   '-- Future Ready Group System: complete database schema snapshot (structure only: no data, no secrets).',
