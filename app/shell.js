@@ -135,15 +135,128 @@ document.addEventListener("click", e => { if (!e.target.closest(".foot") && !$("
 
 /* ---------- gate: sign-in, sign-up, pending, disabled ---------- */
 function showGate(msg, note) { $("#gate").hidden = false; if (msg) $("#gate-msg").textContent = msg; $("#gate-note").textContent = note || ""; gateShow.start(); }
-const GATE_COPY = {
-  in: { title: "Welcome back", msg: "One account for every Future Ready company. Use the Google account your Admin knows.", btn: "Continue with Google" },
-  req: { title: "Join the team", msg: "New here? Sign in with Google, tell us your company and the access you need, and an Admin approves it. It takes a minute.", btn: "Start with Google" },
-};
-function gateMode(mode) {
-  const c = GATE_COPY[mode] || GATE_COPY.in;
-  $("#gate-title").textContent = c.title; $("#gate-msg").textContent = c.msg;
-  const b = $("#gate-google"); if (b) b.lastChild.textContent = c.btn;
-  $$("#gate-seg button").forEach(x => { const on = x.dataset.mode === mode; x.classList.toggle("on", on); x.setAttribute("aria-selected", on ? "true" : "false"); });
+const GOOGLE_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#fff" opacity=".8" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fff" opacity=".6" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#fff" opacity=".9" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></svg>`;
+const googleBtn = (label = "Continue with Google") => `<div class="or"><span>or</span></div><button type="button" class="btn gbtn" id="gate-google">${GOOGLE_SVG}${esc(label)}</button>`;
+const pwField = (id, label, auto, extra = "") => `<div class="field"><label for="${id}">${label}</label><div class="pw"><input id="${id}" type="password" autocomplete="${auto}" minlength="8" required ${extra}><button type="button" class="eye" data-for="${id}" aria-label="Show password">Show</button></div></div>`;
+const redirectTo = () => location.origin + location.pathname;
+// Supabase error text → plain words
+function authErr(e) {
+  const m = String(e?.message || e || "");
+  if (/invalid login credentials/i.test(m)) return "Wrong email or password.";
+  if (/email not confirmed/i.test(m)) return "Confirm your email first: open the message we sent you, then sign in.";
+  if (/already registered|already been registered/i.test(m)) return "That email already has an account. Sign in, or use Forgot password.";
+  if (/rate limit|too many/i.test(m)) return "Too many attempts. Wait a few minutes and try again.";
+  if (/password should be|weak|at least/i.test(m)) return "Use a longer password: at least 8 characters.";
+  if (/same password|different from the old/i.test(m)) return "Choose a password you have not used here before.";
+  return m || "Something went wrong. Try again.";
+}
+async function googleSignIn() {
+  showGate("Opening Google sign-in…", "");
+  const { error } = await SB().auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
+  if (error) showGate("Sign-in failed.", authErr(error));
+}
+function wireGateBody(root) {
+  $$(".eye", root).forEach(b => b.onclick = () => { const i = $("#" + b.dataset.for); const show = i.type === "password"; i.type = show ? "text" : "password"; b.textContent = show ? "Hide" : "Show"; });
+  $("#gate-google", root)?.addEventListener("click", googleSignIn);
+}
+function busy(btn, on, label) { btn.disabled = on; btn.textContent = on ? "Please wait…" : label; }
+// The note (errors, confirmations) lives under whichever form is showing; park it outside before a form is replaced.
+function parkNote() { let n = $("#gate-note"); if (!n) { n = document.createElement("p"); n.className = "hint"; n.id = "gate-note"; } $("#gate-card").insertBefore(n, $("#gate-card .fine")); n.textContent = ""; return n; }
+function gateMode(mode, d = {}) {
+  const title = $("#gate-title"), msg = $("#gate-msg"), body = $("#gate-body"), note = parkNote();
+  $("#gate-seg").hidden = false;
+  queueMicrotask(() => { const f = $("#gate-form"); if (f) f.appendChild(note); });
+  $$("#gate-seg button").forEach(x => { const on = x.dataset.mode === (mode === "req" ? "req" : "in"); x.classList.toggle("on", on); x.setAttribute("aria-selected", on ? "true" : "false"); });
+  if (mode === "req") {
+    title.textContent = "Join the team"; msg.textContent = "Create your account, confirm your email, then choose the company and access you need. An Admin approves it.";
+    body.innerHTML = `<form id="gate-form" novalidate>
+      <div class="field"><label for="su-name">Your name</label><input id="su-name" autocomplete="name" required placeholder="As colleagues know you"></div>
+      <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+      ${pwField("su-pass", "Password", "new-password", 'placeholder="At least 8 characters"')}
+      ${pwField("su-pass2", "Confirm password", "new-password")}
+      <button class="btn primary" type="submit" id="gate-go">Create account</button>
+      </form>${googleBtn("Continue with Google instead")}`;
+    wireGateBody(body);
+    $("#gate-form").onsubmit = async e => {
+      e.preventDefault();
+      const name = $("#su-name").value.trim(), email = $("#su-email").value.trim().toLowerCase(), p1 = $("#su-pass").value, p2 = $("#su-pass2").value;
+      if (!name) return note.textContent = "Your name is required.";
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return note.textContent = "That is not a valid email address.";
+      if (p1.length < 8) return note.textContent = "Use at least 8 characters for the password.";
+      if (p1 !== p2) return note.textContent = "The two passwords do not match.";
+      note.textContent = ""; const b = $("#gate-go"); busy(b, true);
+      const { data, error } = await SB().auth.signUp({ email, password: p1, options: { data: { full_name: name }, emailRedirectTo: redirectTo() } });
+      busy(b, false, "Create account");
+      if (error) return note.textContent = authErr(error);
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return note.textContent = authErr({ message: "already registered" });
+      if (data?.session) return; // confirmation switched off in Supabase: the SIGNED_IN event takes over
+      gateMode("check", { email });
+    };
+    return;
+  }
+  if (mode === "forgot") {
+    title.textContent = "Reset your password"; msg.textContent = "Enter your email and we will send a link to choose a new password.";
+    body.innerHTML = `<form id="gate-form" novalidate>
+      <div class="field"><label for="fp-email">Email</label><input id="fp-email" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+      <button class="btn primary" type="submit" id="gate-go">Send reset link</button>
+      <button class="btn link" type="button" id="gate-back">Back to sign in</button></form>`;
+    $("#gate-back").onclick = () => gateMode("in");
+    $("#gate-form").onsubmit = async e => {
+      e.preventDefault(); const email = $("#fp-email").value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return note.textContent = "That is not a valid email address.";
+      const b = $("#gate-go"); busy(b, true);
+      const { error } = await SB().auth.resetPasswordForEmail(email, { redirectTo: redirectTo() });
+      busy(b, false, "Send reset link");
+      if (error) return note.textContent = authErr(error);
+      title.textContent = "Check your inbox"; msg.textContent = `If ${email} has an account, a reset link is on its way. It works once and expires in an hour.`;
+      parkNote(); body.innerHTML = `<button class="btn" type="button" id="gate-back">Back to sign in</button>`; $("#gate-back").onclick = () => gateMode("in");
+    };
+    return;
+  }
+  if (mode === "check") {
+    const email = d.email || "";
+    title.textContent = "Check your inbox"; msg.textContent = `We sent a confirmation link to ${email}. Open it, then come back and sign in. Look in Spam if it has not arrived in two minutes.`;
+    body.innerHTML = `<div class="toolbar"><button class="btn" type="button" id="gate-resend">Send it again</button><button class="btn link" type="button" id="gate-back">Back to sign in</button></div>`;
+    $("#gate-back").onclick = () => gateMode("in");
+    $("#gate-resend").onclick = async () => { const b = $("#gate-resend"); busy(b, true); const { error } = await SB().auth.resend({ type: "signup", email, options: { emailRedirectTo: redirectTo() } }); busy(b, false, "Send it again"); note.textContent = error ? authErr(error) : "Sent again."; };
+    return;
+  }
+  if (mode === "recover") {
+    $("#gate-seg").hidden = true;
+    title.textContent = "Choose a new password"; msg.textContent = `For ${d.email || "your account"}. At least 8 characters.`;
+    body.innerHTML = `<form id="gate-form" novalidate>${pwField("np-pass", "New password", "new-password")}${pwField("np-pass2", "Confirm new password", "new-password")}<button class="btn primary" type="submit" id="gate-go">Save password</button></form>`;
+    wireGateBody(body);
+    $("#gate-form").onsubmit = async e => {
+      e.preventDefault(); const p1 = $("#np-pass").value, p2 = $("#np-pass2").value;
+      if (p1.length < 8) return note.textContent = "Use at least 8 characters.";
+      if (p1 !== p2) return note.textContent = "The two passwords do not match.";
+      const b = $("#gate-go"); busy(b, true);
+      const { error } = await SB().auth.updateUser({ password: p1 });
+      busy(b, false, "Save password");
+      if (error) return note.textContent = authErr(error);
+      S.recovering = false; toast("Password saved", "ok");
+      const { data: { session } } = await SB().auth.getSession(); if (session) enter(session);
+    };
+    return;
+  }
+  // default: sign in
+  title.textContent = "Welcome back"; msg.textContent = "One account for every Future Ready company.";
+  body.innerHTML = `<form id="gate-form" novalidate>
+    <div class="field"><label for="si-email">Email</label><input id="si-email" type="email" autocomplete="username" required placeholder="you@example.com"></div>
+    ${pwField("si-pass", "Password", "current-password")}
+    <div class="row"><button class="btn link" type="button" id="gate-forgot">Forgot password?</button></div>
+    <button class="btn primary" type="submit" id="gate-go">Sign in</button>
+    </form>${googleBtn()}`;
+  wireGateBody(body);
+  $("#gate-forgot").onclick = () => gateMode("forgot");
+  $("#gate-form").onsubmit = async e => {
+    e.preventDefault(); const email = $("#si-email").value.trim().toLowerCase(), password = $("#si-pass").value;
+    if (!email || !password) return note.textContent = "Enter your email and password.";
+    note.textContent = ""; const b = $("#gate-go"); busy(b, true);
+    const { error } = await SB().auth.signInWithPassword({ email, password });
+    if (error) { busy(b, false, "Sign in"); note.textContent = authErr(error); return; }
+    // SIGNED_IN event → enter()
+  };
 }
 /* ---------- gate slideshow: what the companies do. Photos: Unsplash, free licence (commercial use allowed), served from their CDN. ---------- */
 const GATE_SLIDES = [
@@ -198,6 +311,7 @@ const gateShow = (() => {
   function restart() { if (timer) { stop(); start(); } }
   return { start, stop };
 })();
+const hasPassword = () => !!(S.session?.user?.identities || []).some(i => i.provider === "email");
 function googleProfile(session) {
   const u = session?.user?.user_metadata || {};
   const name = u.full_name || u.name || "";
@@ -205,11 +319,11 @@ function googleProfile(session) {
   return { name, avatar: u.avatar_url || u.picture || "", first: u.given_name || parts[0] || "", surname: u.family_name || (parts.length > 1 ? parts[parts.length - 1] : ""), other: parts.length > 2 ? parts.slice(1, -1).join(" ") : "" };
 }
 function gateState(state, d = {}) {
-  const card = $("#gate-card"), title = $("#gate-title"), msg = $("#gate-msg"), body = $("#gate-body"), note = $("#gate-note");
+  const card = $("#gate-card"), title = $("#gate-title"), msg = $("#gate-msg"), body = $("#gate-body"), note = parkNote();
   card.classList.toggle("wide", state === "signup");
   $("#gate").hidden = false; note.textContent = ""; $("#gate-seg").hidden = true; gateShow.start();
   const signout = `<button class="btn small" id="gate-out">Sign out</button>`;
-  if (state === "invited") { title.textContent = "You have been invited"; msg.textContent = "Sign in with the Google account that received the invitation email. Your account is ready; you will only be asked for your details."; return; }
+  if (state === "invited") { gateMode("in"); $("#gate-seg").hidden = false; title.textContent = "You have been invited"; msg.textContent = "Sign in, or create an account, with the email address that received the invitation. Your access is ready; you will only be asked for your details."; return; }
   if (state === "signup") {
     const g = d.g || {}, comps = (d.companies || []).filter(c => c.active);
     title.textContent = "Request access";
@@ -249,20 +363,25 @@ async function boot() {
   $("#foot-sheet").href = CFG.sheetUrl || "#";
   $$("#gate-seg button").forEach(b => b.onclick = () => gateMode(b.dataset.mode));
   gateMode("in");
+  S.recovering = /type=recovery/.test(location.hash);
   if (!CFG.supabaseUrl || !CFG.supabaseKey || !window.supabase) { showGate("This copy is not configured.", "config.js must set supabaseUrl and supabaseKey."); setSync(false, "not configured"); return; }
   FR.SB = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
   const inv = new URLSearchParams(location.search).get("invite");
   if (inv) { safeSet("fr_invite", inv); try { history.replaceState(null, "", location.pathname + location.hash); } catch {} }
   if (inv || safeGet("fr_invite")) gateState("invited");
-  $("#gate-google").onclick = async () => { showGate("Opening Google sign-in…", ""); const { error } = await SB().auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } }); if (error) showGate("Sign-in failed.", error.message); };
-  SB().auth.onAuthStateChange((ev, sess) => { if (ev === "SIGNED_OUT") location.reload(); else if (ev === "SIGNED_IN" && sess && !S.me && !S.entering) enter(sess); });
+  SB().auth.onAuthStateChange((ev, sess) => {
+    if (ev === "SIGNED_OUT") location.reload();
+    else if (ev === "PASSWORD_RECOVERY" && sess) { S.recovering = true; try { history.replaceState(null, "", location.pathname); } catch {} gateMode("recover", { email: sess.user?.email }); showGate(); }
+    else if (ev === "SIGNED_IN" && sess && !S.me && !S.entering && !S.recovering) enter(sess);
+  });
   const { data: { session } } = await SB().auth.getSession();
+  if (S.recovering && session) { gateMode("recover", { email: session.user?.email }); showGate(); setSync(false, "signed out"); return; }
   if (!session) { showGate(); setSync(false, "signed out"); FR.paintRole(); return; }
   await enter(session);
 }
 async function enter(session) {
-  if (S.me || S.entering) return; S.entering = true;
-  showGate("Checking your access…", "");
+  if (S.me || S.entering) return; S.entering = true; S.session = session;
+  parkNote(); showGate("Checking your access…", ""); $("#gate-title").textContent = "One moment"; $("#gate-body").innerHTML = ""; $("#gate-seg").hidden = true;
   if (/access_token|refresh_token|error=|code=/.test(location.hash + location.search)) { try { history.replaceState(null, "", location.pathname); } catch {} }
   const email = (session.user.email || "").toLowerCase();
   const g = googleProfile(session);
@@ -331,7 +450,23 @@ function openProfile(first) {
       <div class="field"><label>Position</label><input id="pf-pos" value="${esc(v.position)}" placeholder="e.g. CEO, Managing Director, Lead Supervisor" list="pf-pos-list"><datalist id="pf-pos-list"><option>CEO</option><option>Managing Director</option><option>General Supervisor</option><option>Lead Supervisor</option><option>HR Manager</option><option>Recruiter</option><option>Operations Manager</option><option>Assistant</option></datalist></div>
     </div>
     <p class="hint" id="pf-err" style="color:var(--bad)"></p>
-    <div class="toolbar" style="justify-content:flex-end;margin-top:12px">${first ? "" : `<button class="btn" id="pf-cancel">Cancel</button>`}<button class="btn primary" id="pf-save">${first ? "Save and continue" : "Save"}</button></div>`;
+    <div class="toolbar" style="justify-content:flex-end;margin-top:12px">${first ? "" : `<button class="btn" id="pf-cancel">Cancel</button>`}<button class="btn primary" id="pf-save">${first ? "Save and continue" : "Save"}</button></div>
+    ${first ? "" : `<details class="pf-pass"><summary>${hasPassword() ? "Change password" : "Set a password"}</summary>
+      <p class="hint">${hasPassword() ? "You will stay signed in here; other devices will need the new password." : "Lets you sign in with your email and a password as well as with Google."}</p>
+      <div class="fields">${pwField("pf-pass", "New password", "new-password")}${pwField("pf-pass2", "Confirm new password", "new-password")}</div>
+      <p class="hint" id="pf-pass-err" style="color:var(--bad)"></p>
+      <div class="toolbar" style="justify-content:flex-end"><button class="btn" id="pf-pass-save">Save password</button></div></details>`}`;
+  wireGateBody(modal);
+  $("#pf-pass-save")?.addEventListener("click", async () => {
+    const p1 = $("#pf-pass").value, p2 = $("#pf-pass2").value, err = $("#pf-pass-err");
+    if (p1.length < 8) return err.textContent = "Use at least 8 characters.";
+    if (p1 !== p2) return err.textContent = "The two passwords do not match.";
+    err.textContent = ""; const b = $("#pf-pass-save"); busy(b, true);
+    const { error } = await SB().auth.updateUser({ password: p1 });
+    busy(b, false, "Save password");
+    if (error) return err.textContent = authErr(error);
+    $("#pf-pass").value = $("#pf-pass2").value = ""; toast("Password saved", "ok");
+  });
   let photo = v.photo_url;
   const setAvatar = url => { photo = url; $("#pf-avatar").innerHTML = url ? `<img src="${esc(url)}" alt="">` : esc(initials); };
   $("#pf-upload").onclick = () => $("#pf-file").click();

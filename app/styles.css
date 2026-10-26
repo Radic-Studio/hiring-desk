@@ -35,6 +35,28 @@ img{max-width:100%}
 .gate .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;max-width:360px;padding:14px 18px;font-size:15px}
 .gate .gbtn svg{width:18px;height:18px}
 .gate .fields{text-align:left}
+.gate-form form{display:grid;gap:12px;max-width:360px}
+.gate-form .field{display:grid;gap:5px}
+.gate-form .field label{font-size:13px;font-weight:600;color:var(--fg)}
+.gate-form .field input{width:100%;padding:11px 12px;font:400 15px var(--body);border:1px solid var(--line-2);border-radius:10px;background:var(--surface);color:var(--fg)}
+.gate-form .field input:focus{outline:none;border-color:var(--accent);box-shadow:var(--accent-glow)}
+.pw{position:relative}
+.pw input{padding-right:64px!important}
+.pw .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:var(--surface-2);color:var(--muted);font:600 12px var(--body);padding:5px 9px;border-radius:7px;cursor:pointer}
+.pw .eye:hover{color:var(--fg)}
+.gate-form .row{display:flex;justify-content:flex-end;margin-top:-4px}
+.btn.link{background:none;border:0;color:var(--accent);font-weight:600;padding:4px 0;box-shadow:none;cursor:pointer}
+.btn.link:hover{text-decoration:underline;background:none}
+.gate-form .btn.primary{width:100%;padding:13px 18px;font-size:15px}
+.gate .or{display:flex;align-items:center;gap:12px;max-width:360px;margin:14px 0 12px;color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.gate .or::before,.gate .or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gate .gbtn{background:var(--surface);color:var(--fg);border:1px solid var(--line-2)}
+.gate .gbtn:hover{background:var(--surface-2)}
+.gate .gbtn svg path{fill:var(--accent)}
+.pf-pass{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.pf-pass summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.pf-pass .fields{margin-top:10px}
+.pf-pass .field label{font-size:12px;color:var(--muted)}
 .gate .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .gate .who .avatar{width:34px;height:34px}
 .gate .hint:empty{display:none}
